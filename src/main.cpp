@@ -1,194 +1,205 @@
+/*******************************************************************************
+****文件路径         : \ESP32WebScope\src\main.cpp
+****作者名称         : guohaomeng
+****文件版本         : V1.0.0
+****创建日期         : 2022-07-01 13:07:26
+****简要说明         :
+****
+****版权信息         : 2022 by guohaomeng, All Rights Reserved.
+********************************************************************************/
 #include <Arduino.h>
-#include <driver/i2s.h>
-#include "driver/dac.h"
-
 #include <WiFi.h>
-#include <math.h>
-#include <stdio.h>
-#include <string.h>
+#include <I2S.h>
 
-double uMaxValue = 3.3;    //峰峰值
-double offSetValue = 1.65; //偏置电压
-int duty = 50;             //占空比%(方波)
-int wave = 1;              //波形种类
-#define samplePerCycle 255
-//定义8位R2R DA输出的对应值
-uint8_t waveTab1[samplePerCycle];
-uint8_t waveTab[samplePerCycle];
-//定义图形周期
-int waveindex = 2;
-unsigned int freq = 100;
-unsigned int freq_old = 100;
-//波形模式切换按键
-const int button = 12;
-char received_data[5] = {0};
-unsigned int rec_cnt1 = 0;
+#include "mywebsocket/mywebsocket.h"
+#include "wave_gen.hpp"
 
-const char *ssid = "HONOR-0511YJ";   // Enter SSID
-const char *password = "tian5019@."; // Enter Password
+#define ADC_SAMPLE_SIZE 256
+uint16_t ADC_sample[ADC_SAMPLE_SIZE];
+int sampleRate = 8000;
+bool chart_refresh = false;
 
-/* 创建硬件定时器 */
-hw_timer_t *timer = NULL;
+/* 实例化一个波形发生器 */
+WAVE_TYPE wave_type = SIN;
+WAVE_GEN wave_gen(3.3, 1.65, 50, 100, SIN);
 
-void IRAM_ATTR onTimer()
+/* 建立http及websocket服务器 */
+myWebSocket::CombinedServer server;
+IPAddress APIP = IPAddress(192, 168, 8, 1);
+IPAddress subnet = IPAddress(255, 255, 255, 0);
+myWebSocket::WebSocketClient *client1 = nullptr;
+bool websocket_init();
+
+/*******************************************************************************
+****函数功能: 核心0上运行的任务2，运行websocket服务器与http服务器，与上位机通过WiFi进行通信
+****入口参数: *arg:
+****出口参数: 无
+****函数备注: 将主程序与WiFi通信程序分别放两个核心上运行，提高执行速度
+********************************************************************************/
+void Task2(void *arg)
 {
-  if (waveindex >= 255)
+  websocket_init();
+  vTaskDelay(500 / portTICK_PERIOD_MS);
+  while (true)
   {
-    waveindex = 0;
+    server.loop();
+    if (client1 != nullptr && chart_refresh == true)
+    {
+      for (int i = 0; i < ADC_SAMPLE_SIZE; i++)
+      { /* 向上位机发送数据 */
+        client1->send(String(i) + String(":") + String(ADC_sample[i]));
+      }
+    }
+    vTaskDelay(15 / portTICK_PERIOD_MS);
   }
-  dacWrite(25, waveTab[waveindex]);
-  waveindex++;
+  vTaskDelete(NULL);
 }
-void updateTimer()
-{
-  timerAlarmDisable(timer);                  //先关闭定时器
-  uint64_t dacTime = 1000000 / (freq * 255); //波形周期,微秒
-  /* *设置闹钟每秒调用onTimer函数1 tick为1us => 1秒为1000000us * /
-  / *重复闹钟（第三个参数）*/
-  timerAlarmWrite(timer, dacTime, true);
-  /* 启动警报*/
-  timerAlarmEnable(timer);
-}
-void waveSelect();
-void wave_gen(int index);
-void InitWeb();
-char webpage[] PROGMEM = R"=====(
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head> 
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>波形发生器</title>
-  <style>
-    *{margin: 0;padding: 0;}
-  </style>
-</head>
-<body onload="javascript:init()">
-  <div>
-    <p>coming soon~</p>
-  </div>  
-</body>
-<script>
-  var webSocket;
-  function init(){
-    webSocket = new WebSocket('ws://'+window.location.hostname +':81/');
-    webSocket.onmessage = function(event){
-    var data = JSON.parse(event.data);
-    console.log(data);
-  }
-}
-</script>
-</html>
-)=====";
-
-
+/*******************************************************************************
+****函数功能: 主程序入口
+****出口参数: 无
+****函数备注: 启动后首先执行setup函数，只执行一次
+********************************************************************************/
 void setup()
 {
   Serial.begin(115200);
+  while (!Serial)
+  {
+    ; // 等待串口建立连接 Needed for native USB port only
+  }
 
-  //设置中断程序
-  // attachInterrupt(button, waveSelect, RISING);
+  /* 初始化基于I2S的ADC，采样频率8KHz，每次采样16位 */
+  if (!I2S.begin(I2S_LEFT_JUSTIFIED_MODE, sampleRate, 16))
+  {
+    Serial.println("I2S初始化失败!");
+    I2S.end();
+    while (1)
+      ; // 无动作
+  }
 
-  //输出端口
-  pinMode(25, OUTPUT);
-  //默认输出正玄波
-  wave_gen(1);
+  /* 初始化波形发生器 */
+  wave_gen.initTimer();
 
-  InitWeb();
-
-  /*  1/(80MHZ/80) = 1us  */
-  timer = timerBegin(0, 80, true);
-
-  /* 将onTimer函数附加到我们的计时器 */
-  timerAttachInterrupt(timer, &onTimer, true);
-
-  /* *设置闹钟每秒调用onTimer函数1 tick为1us   => 1秒为1000000us * /
-  / *重复闹钟（第三个参数）*/
-  timerAlarmWrite(timer, 1000000 / (freq * 255), true);
-
-  /* 启动警报*/
-  timerAlarmEnable(timer);
+  /* 创建任务2，建立并保持与上位机的通信 */
+  xTaskCreatePinnedToCore(Task2, "Task2", 24 * 4096, NULL, 1, NULL, 0);
+  vTaskDelay(500 / portTICK_PERIOD_MS);
 }
-
+/*******************************************************************************
+****函数功能: loop函数
+****出口参数: 无
+****函数备注: 程序执行完setup函数后，循环执行loop函数
+********************************************************************************/
 void loop()
 {
-
+  // 进行一次采样
+  I2S.read(ADC_sample, sizeof(uint16_t));
+  for (int i = 0; i < ADC_SAMPLE_SIZE; i++)
+  {
+    Serial.printf("adc:%d\n", ADC_sample[i]);
+  }
+  vTaskDelay(50 / portTICK_PERIOD_MS);
 }
 
-// 波形选择程序
-void waveSelect()
+/*******************************************************************************
+****函数功能: websocket服务器及http服务器初始化
+****出口参数: 初始化结果 true/false
+****函数备注: websocket服务器及http服务器初始化，返回初始化结果：成功/失败
+********************************************************************************/
+bool websocket_init()
 {
-  wave++;
-  if (wave > 3)
-  {
-    wave = 1;
-  }
-  wave_gen(wave);
-  // for (int i = 0; i < 255; i++)
-  // {
-  //   printf("dac:%d\n", wavedigital[i]);
-  // }
-  delay(500);
-}
-
-//波形数值生成
-
-void wave_gen(int index)
-{
-
-  if (index == 1)
-  {
-    double sineValue = 0.0;
-    for (int i = 0; i < samplePerCycle; i++)
-    {
-      sineValue = sin(((2 * PI) / samplePerCycle) * i) * (uMaxValue / 2) + offSetValue;
-      waveTab1[i] = (((int)(sineValue * 255 / 3.3)));
-    }
-    Serial.printf("波形表重设成功，当前为正弦波\n");
-  }
-  else if (index == 2)
-  {
-    float x = samplePerCycle * ((float)duty / 100.0);
-    int x1 = (int)x;
-    for (int i = 0; i < samplePerCycle; i++)
-    {
-      if (i < x)
+  //调用函数启用ESP32硬件加速
+  mycrypto::SHA::initialize();
+  WiFi.softAP("ESP32_WebSocketServer");
+  vTaskDelay(300 / portTICK_PERIOD_MS);
+  WiFi.softAPConfig(APIP, APIP, subnet);
+  // 设置websocket服务器及回调函数
+  server.setCallback(
+      [](myWebSocket::WebSocketClient *client, myWebSocket::WebSocketEvents type, uint8_t *payload, uint64_t length)
       {
-        waveTab1[i] = (int)(255 * (uMaxValue / 2 + offSetValue) / 3.3);
-      }
-      else
+        if (length)
+        {
+          if (type == myWebSocket::TYPE_TEXT)
+          {
+            // Serial.print("ID:");
+            // Serial.println(client->getID());
+            Serial.println("Got text data:");
+            // Serial.println(String((char *)payload));
+            char received_chars[10];
+            memset(received_chars, '\0', 10);
+            for (int i = 0; i < length; i++)
+            {
+              if (length >= 10)
+                break;
+              received_chars[i] = payload[i];
+            }
+            Serial.printf("char:%s\n", received_chars);
+
+            if (payload[0] == 'I' && payload[1] == 'D')
+            {
+              client->setID(payload[2]);
+              client1 = client;
+              Serial.printf("ID:%c\n", (char *)payload[2]);
+            }
+
+            client->send(String(received_chars));
+          }
+          else if (type == myWebSocket::TYPE_BIN)
+          {
+            Serial.println("Got binary data, length: " + String((long)length));
+            Serial.println("First byte: " + String(payload[0]));
+            Serial.println("Last byte: " + String(payload[length - 1]));
+          }
+          else if (type == myWebSocket::WS_DISCONNECTED)
+          {
+
+            Serial.println("Websocket disconnected.");
+          }
+          else if (type == myWebSocket::WS_CONNECTED)
+          {
+
+            Serial.println("Websocket connected.");
+          }
+        }
+      });
+  // 开启网页服务器
+  server.on(
+      "/",
+      [](myWebSocket::ExtendedWiFiClient *client, myWebSocket::HttpMethod method, uint8_t *data, uint64_t len)
       {
-        waveTab1[i] = (int)(255 * (-(uMaxValue / 2) + offSetValue) / 3.3);
-      }
-    }
-    Serial.printf("波形表重设成功，当前为方波,占空比:%d\n", duty);
-  }
-  else if (index == 3) //锯齿波
-  {
-    for (int i = -127; i < 128; i++)
-    {
-      waveTab1[i+127] = (int)((i + (offSetValue * 255 / 3.3)) * (uMaxValue / 3.3));
-      
-    }
-    Serial.println("波形表重设成功，当前为锯齿波");
-  }
-  for (int i = 0; i < samplePerCycle; i++)
-  {
-    if (waveTab1[i] > 255)
-    {
-      waveTab1[i] = 255;
-    }
-    if (waveTab1[i] < 0)
-    {
-      waveTab1[i] = 0;
-    }
-    waveTab[i] = (uint8_t)waveTab1[i];
-    Serial.printf("wave:%d\n",waveTab[i]);
-  }
+        client->send(R"(
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>ESP32 Combined Server</title>
+</head>
+
+<body>
+  <h1>Hello World!</h1>
+
+</body>
+
+</html>
+)");
+        client->close();
+      });
+  server.begin(80);
+  return true;
 }
-
-void InitWeb()
+/*******************************************************************************
+****函数功能: 重设I2S采样速度
+****入口参数: sampleRate:采样速度，即每秒采样轮数
+****出口参数: 无
+****函数备注: 无
+********************************************************************************/
+void I2S_set_sampleRate(int sampleRate)
 {
-
+  I2S.end();
+  /* 初始化基于I2S的ADC，采样频率8KHz，每次采样16位 */
+  if (!I2S.begin(I2S_LEFT_JUSTIFIED_MODE, sampleRate, 16))
+  {
+    Serial.println("I2S采样速度更新失败!");
+    I2S.end();
+    while (1)
+      ; // 无动作
+  }
 }
