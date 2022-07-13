@@ -29,7 +29,7 @@ IPAddress APIP = IPAddress(192, 168, 8, 1);
 IPAddress subnet = IPAddress(255, 255, 255, 0);
 myWebSocket::WebSocketClient *client1 = nullptr;
 bool websocket_init();
-
+void I2S_set_sampleRate(int sampleRate);
 /*******************************************************************************
 ****函数功能: 核心0上运行的任务2，运行websocket服务器与http服务器，与上位机通过WiFi进行通信
 ****入口参数: *arg:
@@ -94,7 +94,7 @@ void loop()
   I2S.read(ADC_sample, sizeof(uint16_t));
   for (int i = 0; i < ADC_SAMPLE_SIZE; i++)
   {
-    Serial.printf("adc:%d\n", ADC_sample[i]);
+    Serial.printf("adc:%d,%d\n",i, ADC_sample[i]);
   }
   vTaskDelay(50 / portTICK_PERIOD_MS);
 }
@@ -132,7 +132,7 @@ bool websocket_init()
               received_chars[i] = payload[i];
             }
             Serial.printf("char:%s\n", received_chars);
-
+            /* 上位机发送指令IDx来建立连接，x标记为指定设备ID */
             if (payload[0] == 'I' && payload[1] == 'D')
             {
               client->setID(payload[2]);
