@@ -16,7 +16,7 @@
 
 #define ADC_SAMPLE_SIZE 256
 float ADC_sample[ADC_SAMPLE_SIZE];
-uint32_t sampleRate = 2000;
+uint32_t sampleRate = 2000; // 根据实测，真实的I2S采样频率应为此值的一半
 int sampleStep = 1;
 bool chart_refresh = false;
 
@@ -25,7 +25,7 @@ WAVE_TYPE wave_type = SIN;
 WAVE_GEN wave_gen(3.3, 1.65, 50, 10, SIN);
 
 /* 初始化基于I2S的ADC，默认采样频率8KHz，每次采样16位，ADC精度12位 */
-I2S_ADC i2s_adc(I2S_NUM_0,sampleRate,ADC1_CHANNEL_7,ADC_WIDTH_12Bit);
+I2S_ADC i2s_adc(I2S_NUM_0, sampleRate, ADC1_CHANNEL_7, ADC_WIDTH_12Bit);
 
 /* 建立http及websocket服务器 */
 myWebSocket::CombinedServer server;
@@ -33,6 +33,7 @@ IPAddress APIP = IPAddress(192, 168, 8, 1);
 IPAddress subnet = IPAddress(255, 255, 255, 0);
 myWebSocket::WebSocketClient *client1 = nullptr;
 bool websocket_init();
+void command_loop(void);
 
 /*******************************************************************************
 ****函数功能: 核心0上运行的任务2，运行websocket服务器与http服务器，与上位机通过WiFi进行通信
@@ -84,12 +85,12 @@ void setup()
 void loop()
 {
   // 进行一次采样
-  i2s_adc.get_adc_data(ADC_sample,ADC_SAMPLE_SIZE,sampleStep);
+  i2s_adc.get_adc_data(ADC_sample, ADC_SAMPLE_SIZE, sampleStep);
   for (int i = 0; i < ADC_SAMPLE_SIZE; i++)
   {
-    Serial.printf("adc:%d,%.3f\n",i,ADC_sample[i]);
+    Serial.printf("adc:%d,%.3f\n", i, ADC_sample[i]);
   }
-  
+  command_loop();
   vTaskDelay(50 / portTICK_PERIOD_MS);
 }
 
@@ -178,4 +179,46 @@ bool websocket_init()
       });
   server.begin(80);
   return true;
+}
+
+/*******************************************************************************
+****函数功能: 串口通信函数
+****出口参数: 无
+****函数备注: 解析串口接收到的上位机指令
+********************************************************************************/
+void command_loop(void)
+{
+  // 如果串口是空的直接返回
+  if (Serial.available() == 0)
+    return;
+  char received_chars[10];
+  memset(received_chars, '\0', 10);
+  vTaskDelay(1 / portTICK_PERIOD_MS);
+  // 从串口读取返回的数据，读取20个字符
+  Serial.read(received_chars, 10);
+
+  // 根据指令做不同动作
+  if (received_chars[0] == 'F') // F指令设置波形发生器频率
+  {
+    int F = atoi(received_chars + 1);
+    if (F > 0 && F <= 1500)
+    {
+      wave_gen.freq_old = wave_gen.freq;
+      wave_gen.freq = F;
+      wave_gen.updateTimer();
+    }
+    else{
+      Serial.printf("频率超出范围0~1.5kHz");
+    }
+    Serial.printf("%s,%d\n", received_chars, F);
+  }
+  if (received_chars[0] == 'R') // R指令设置I2S_ADC采样速率
+  {
+    int R = atoi(received_chars + 1);
+    i2s_adc.set_sample_rate((uint32_t)R);
+    Serial.printf("%s,%d\n", received_chars, R);
+  }
+  //  最后清空串口
+  while (Serial.read() >= 0)
+    ;
 }

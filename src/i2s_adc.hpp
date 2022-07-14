@@ -120,7 +120,7 @@ int I2S_ADC::get_adc_data(float *po_AdcValues, int length, int step)
     {
       if (j < length)
         po_AdcValues[j] = adcBuff[i];
-      j++;
+      j+=step;
     }
   }
   // free(i2s_read_buff);
@@ -139,10 +139,11 @@ void I2S_ADC::i2s_reset()
 
 bool I2S_ADC::set_sample_rate(uint32_t rate)
 {
-  if (rate > 64000 || rate < 4000)
+  if (rate > 128000 || rate < 1000)
   {
     return false;
   }
+  this->sample_rate = rate;
   // ESP_ERROR_CHECK(i2s_set_sample_rates(i2s_num, rate));
   esp_err_t ret = i2s_set_sample_rates(i2s_num, rate);
   return (ret == ESP_OK) ? true : false;

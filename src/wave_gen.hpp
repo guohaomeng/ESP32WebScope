@@ -10,6 +10,8 @@
 #ifndef WAVE_GEN_H_
 #define WAVE_GEN_H_
 #include <Arduino.h>
+#include "driver/dac.h"
+#include "driver/timer.h"
 
 #define SAMPLE_PER_CYCLE 256
 #define ADC_MAX_VALUE 255
@@ -21,7 +23,8 @@ enum WAVE_TYPE
   SQUARE,
   SAWTOOTH
 };
-int waveindex = 2;               // 当前波形位置
+int waveindex = 2;                 // 当前波形位置
+int wave_index_step = 1;       // 波形索引递增步长
 uint8_t waveTab[SAMPLE_PER_CYCLE]; // 最终根据配置生成的波形数据
 /* 创建硬件定时器 */
 hw_timer_t *timer = NULL;
@@ -35,7 +38,7 @@ public:
   WAVE_TYPE wave_type;       //波形种类
   unsigned int freq = 100;   // 频率
 
-  unsigned int freq_old = 100;      // 上一次的频率
+  unsigned int freq_old = 100;        // 上一次的频率
   uint8_t waveTab1[SAMPLE_PER_CYCLE]; // 生成的波形数据
 
   /* 波形模式切换按键 */
@@ -56,6 +59,7 @@ public:
   void get_waveindex();
   void waveSelect();
   void waveGen(WAVE_TYPE wave_type);
+  void adjust_step();
 };
 
 /*******************************************************************************
@@ -89,8 +93,8 @@ void IRAM_ATTR onTimer()
   {
     waveindex = 0;
   }
-  dacWrite(25, waveTab[waveindex]);
-  waveindex++;
+  dac_output_voltage(DAC_CHANNEL_1, waveTab[waveindex]);
+  waveindex += wave_index_step;
 }
 /*******************************************************************************
 ****函数功能: 初始化波形发生器
@@ -99,22 +103,25 @@ void IRAM_ATTR onTimer()
 ********************************************************************************/
 void WAVE_GEN::initTimer()
 {
-  /* 输出端口 */
-  pinMode(25, OUTPUT);
+  /* 输出端口DAC_CHANNEL_1,即GPIO25 */
+  dac_output_enable(DAC_CHANNEL_1);
   /* 默认输出正弦波 */
   waveGen(SIN);
 
   /*  1/(80MHZ/80) = 1us  */
   timer = timerBegin(0, 80, true);
-
+  Serial.printf("OK");
   /* 将onTimer函数附加到我们的计时器 */
   timerAttachInterrupt(timer, &onTimer, true);
-
+  Serial.printf("OK");
+  adjust_step();
+  Serial.printf("freq:%d\n",freq);
   /* 设置闹钟每秒调用onTimer函数1 tick为1us   => 1秒为1000000us * /
   /* 重复闹钟（第三个参数）*/
-  uint64_t T =  1000000 / (freq * SAMPLE_PER_CYCLE);
+  uint64_t T =  (1000000 * wave_index_step) / (freq * SAMPLE_PER_CYCLE);
+  Serial.printf("T:%d\n",T);
   timerAlarmWrite(timer, T, true);
-  
+
   /* 启动定时器 */
   timerAlarmEnable(timer);
   Serial.println("定时器启动成功");
@@ -126,12 +133,13 @@ void WAVE_GEN::initTimer()
 ********************************************************************************/
 void WAVE_GEN::updateTimer()
 {
-  timerAlarmDisable(timer);                  //先关闭定时器
-  uint64_t dacTime = 1000000 / (freq * SAMPLE_PER_CYCLE); //波形周期,微秒
-  /* *设置闹钟每秒调用onTimer函数1 tick为1us => 1秒为1000000us * /
-  / *重复闹钟（第三个参数）*/
+  timerAlarmDisable(timer); //先关闭定时器
+  adjust_step();
+  uint64_t dacTime = (1000000 * wave_index_step) / (freq * SAMPLE_PER_CYCLE); //波形周期,微秒
+  /* 设置闹钟每秒调用onTimer函数1 tick为1us => 1秒为1000000us */
+  /* 重复闹钟（第三个参数）*/
   timerAlarmWrite(timer, dacTime, true);
-  /* 启动警报*/
+  /* 启动警报 */
   timerAlarmEnable(timer);
 }
 /*******************************************************************************
@@ -172,9 +180,9 @@ void WAVE_GEN::waveGen(WAVE_TYPE wave_type)
   }
   else if (wave_type == SAWTOOTH) //锯齿波
   {
-    for (int i = -(SAMPLE_PER_CYCLE/2); i < (SAMPLE_PER_CYCLE/2); i++)
+    for (int i = -(SAMPLE_PER_CYCLE / 2); i < (SAMPLE_PER_CYCLE / 2); i++)
     {
-      waveTab1[i + (SAMPLE_PER_CYCLE/2)] = (int)((i + (offSetValue * ADC_MAX_VALUE / ADC_MAX_VOLTAGE)) * (uMaxValue / ADC_MAX_VOLTAGE));
+      waveTab1[i + (SAMPLE_PER_CYCLE / 2)] = (int)((i + (offSetValue * ADC_MAX_VALUE / ADC_MAX_VOLTAGE)) * (uMaxValue / ADC_MAX_VOLTAGE));
     }
     Serial.println("波形表重设成功，当前为锯齿波");
   }
@@ -191,6 +199,19 @@ void WAVE_GEN::waveGen(WAVE_TYPE wave_type)
     waveTab[i] = (uint8_t)waveTab1[i];
     // Serial.printf("wave:%d\n", waveTab[i]);
   }
+}
+
+void WAVE_GEN::adjust_step()
+{
+  if (freq > 0 && freq <= 100)
+  {
+    wave_index_step = 1;
+  }
+  else if (freq > 100 && freq <= 1500)
+  {
+    wave_index_step = (int)(freq / 100) + 1;
+  }
+  else{}
 }
 
 void WAVE_GEN::waveSelect()
