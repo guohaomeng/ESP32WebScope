@@ -21,7 +21,8 @@ enum WAVE_TYPE
 };
 int waveindex = 2;               // 当前波形位置
 uint8_t waveTab[samplePerCycle]; // 最终根据配置生成的波形数据
-
+/* 创建硬件定时器 */
+hw_timer_t *timer = NULL;
 class WAVE_GEN
 {
 public:
@@ -48,8 +49,6 @@ public:
   int set_freq(int freq);
   int set_wave_type(WAVE_TYPE wave_type);
 
-  /* 创建硬件定时器 */
-  hw_timer_t *timer = NULL;
   void initTimer();
   void updateTimer();
   void get_waveindex();
@@ -84,7 +83,7 @@ WAVE_GEN::~WAVE_GEN() {}
 ********************************************************************************/
 void IRAM_ATTR onTimer()
 {
-  if (waveindex >= 255)
+  if (waveindex >= samplePerCycle)
   {
     waveindex = 0;
   }
@@ -111,10 +110,12 @@ void WAVE_GEN::initTimer()
 
   /* *设置闹钟每秒调用onTimer函数1 tick为1us   => 1秒为1000000us * /
   / *重复闹钟（第三个参数）*/
-  timerAlarmWrite(timer, 1000000 / (freq * 255), true);
-
+  uint64_t T =  1000000 / (freq * 255);
+  timerAlarmWrite(timer, T, true);
+  
   /* 启动定时器 */
   timerAlarmEnable(timer);
+  Serial.println("定时器启动成功");
 }
 /*******************************************************************************
 ****函数功能: 更新定时器

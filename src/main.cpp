@@ -11,17 +11,21 @@
 #include "mywebsocket/mywebsocket.h"
 #include <WiFi.h>
 
-#include <I2S.h>
+#include "i2s_adc.hpp"
 #include "wave_gen.hpp"
 
 #define ADC_SAMPLE_SIZE 256
-uint16_t ADC_sample[ADC_SAMPLE_SIZE];
-int sampleRate = 8000;
+float ADC_sample[ADC_SAMPLE_SIZE];
+uint32_t sampleRate = 2000;
+int sampleStep = 1;
 bool chart_refresh = false;
 
 /* 实例化一个波形发生器 */
 WAVE_TYPE wave_type = SIN;
-WAVE_GEN wave_gen(3.3, 1.65, 50, 100, SIN);
+WAVE_GEN wave_gen(3.3, 1.65, 50, 10, SIN);
+
+/* 初始化基于I2S的ADC，默认采样频率8KHz，每次采样16位，ADC精度12位 */
+I2S_ADC i2s_adc(I2S_NUM_0,sampleRate,ADC1_CHANNEL_7,ADC_WIDTH_12Bit);
 
 /* 建立http及websocket服务器 */
 myWebSocket::CombinedServer server;
@@ -29,7 +33,7 @@ IPAddress APIP = IPAddress(192, 168, 8, 1);
 IPAddress subnet = IPAddress(255, 255, 255, 0);
 myWebSocket::WebSocketClient *client1 = nullptr;
 bool websocket_init();
-void I2S_set_sampleRate(int sampleRate);
+
 /*******************************************************************************
 ****函数功能: 核心0上运行的任务2，运行websocket服务器与http服务器，与上位机通过WiFi进行通信
 ****入口参数: *arg:
@@ -38,7 +42,7 @@ void I2S_set_sampleRate(int sampleRate);
 ********************************************************************************/
 void Task2(void *arg)
 {
-  websocket_init();
+
   vTaskDelay(500 / portTICK_PERIOD_MS);
   while (true)
   {
@@ -62,23 +66,12 @@ void Task2(void *arg)
 void setup()
 {
   Serial.begin(115200);
-  while (!Serial)
-  {
-    ; // 等待串口建立连接 Needed for native USB port only
-  }
-
-  /* 初始化基于I2S的ADC，采样频率8KHz，每次采样16位 */
-  if (!I2S.begin(I2S_LEFT_JUSTIFIED_MODE, sampleRate, 16))
-  {
-    Serial.println("I2S初始化失败!");
-    I2S.end();
-    while (1)
-      ; // 无动作
-  }
 
   /* 初始化波形发生器 */
   wave_gen.initTimer();
-
+  Serial.println("波形发生器初始化成功");
+  websocket_init();
+  Serial.println("websocket初始化成功");
   /* 创建任务2，建立并保持与上位机的通信 */
   xTaskCreatePinnedToCore(Task2, "Task2", 24 * 4096, NULL, 1, NULL, 0);
   vTaskDelay(500 / portTICK_PERIOD_MS);
@@ -91,11 +84,12 @@ void setup()
 void loop()
 {
   // 进行一次采样
-  I2S.read(ADC_sample, sizeof(uint16_t));
+  i2s_adc.get_adc_data(ADC_sample,ADC_SAMPLE_SIZE,sampleStep);
   for (int i = 0; i < ADC_SAMPLE_SIZE; i++)
   {
-    Serial.printf("adc:%d,%d\n",i, ADC_sample[i]);
+    Serial.printf("adc:%d,%.3f\n",i,ADC_sample[i]);
   }
+  
   vTaskDelay(50 / portTICK_PERIOD_MS);
 }
 
@@ -184,22 +178,4 @@ bool websocket_init()
       });
   server.begin(80);
   return true;
-}
-/*******************************************************************************
-****函数功能: 重设I2S采样速度
-****入口参数: sampleRate:采样速度，即每秒采样轮数
-****出口参数: 无
-****函数备注: 无
-********************************************************************************/
-void I2S_set_sampleRate(int sampleRate)
-{
-  I2S.end();
-  /* 初始化基于I2S的ADC，采样频率8KHz，每次采样16位 */
-  if (!I2S.begin(I2S_LEFT_JUSTIFIED_MODE, sampleRate, 16))
-  {
-    Serial.println("I2S采样速度更新失败!");
-    I2S.end();
-    while (1)
-      ; // 无动作
-  }
 }
