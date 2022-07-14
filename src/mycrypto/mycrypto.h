@@ -19,10 +19,12 @@
 #include "soc/dport_access.h"
 #include "soc/hwcrypto_reg.h"
 
+#ifndef _DRIVER_PERIPH_CTRL_H_
 #if ESP_IDF_VERSION_MAJOR < 4
 #include "esp_private/periph_ctrl.h"
 #else
 #include "driver/periph_ctrl.h"
+#endif
 #endif
 
 #define MY_CRYPTO_DEBUG_HEADER "mycrypto"
@@ -174,41 +176,6 @@ namespace mycrypto
         }
     };
 
-    class AES
-    {
-    public:
-        static inline void initialize() { periph_module_enable(PERIPH_AES_MODULE); }
-
-        // AES encryption and decryption according to ESPRESSIF ESP32 technical reference manual,
-        // chapter 22, page 523(Chinese version)
-        static uint8_t *aes256CBCEncrypt(uint8_t *key,    // 32 bytes
-                                         uint8_t *iv,     // 16 bytes
-                                         uint8_t *plain,  // plain data
-                                         uint32_t length, // length of plain
-                                         uint32_t *outLen // length of output
-        );
-
-        static uint8_t *aes256CBCDecrypt(
-            uint8_t *key,    // 32 bytes key
-            uint8_t *iv,     // 16 bytes iv
-            uint8_t *cipher, // cipher data
-            uint32_t length, // length of cipher data
-            uint32_t *outLen // length of output
-        );
-
-        // get hex string of aes 256 cbc
-        static String aes256CBCEncrypt(String key,  // key
-                                       String iv,   // iv
-                                       String plain // data
-        );
-
-        // get original data form aes 256 cbc hex string
-        static String AES::aes256CBCDecrypt(
-            String key,   // key
-            String iv,    // iv
-            String cipher // data, hex format
-        );
-    };
 }
 
 #endif

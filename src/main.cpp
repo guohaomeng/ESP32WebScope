@@ -8,10 +8,10 @@
 ****版权信息         : 2022 by guohaomeng, All Rights Reserved.
 ********************************************************************************/
 #include <Arduino.h>
-#include <WiFi.h>
-#include <I2S.h>
-
 #include "mywebsocket/mywebsocket.h"
+#include <WiFi.h>
+
+#include <I2S.h>
 #include "wave_gen.hpp"
 
 #define ADC_SAMPLE_SIZE 256
