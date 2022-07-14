@@ -11,7 +11,9 @@
 #define WAVE_GEN_H_
 #include <Arduino.h>
 
-#define samplePerCycle 255
+#define SAMPLE_PER_CYCLE 256
+#define ADC_MAX_VALUE 255
+#define ADC_MAX_VOLTAGE 3.3f
 
 enum WAVE_TYPE
 {
@@ -20,7 +22,7 @@ enum WAVE_TYPE
   SAWTOOTH
 };
 int waveindex = 2;               // 当前波形位置
-uint8_t waveTab[samplePerCycle]; // 最终根据配置生成的波形数据
+uint8_t waveTab[SAMPLE_PER_CYCLE]; // 最终根据配置生成的波形数据
 /* 创建硬件定时器 */
 hw_timer_t *timer = NULL;
 class WAVE_GEN
@@ -34,7 +36,7 @@ public:
   unsigned int freq = 100;   // 频率
 
   unsigned int freq_old = 100;      // 上一次的频率
-  uint8_t waveTab1[samplePerCycle]; // 生成的波形数据
+  uint8_t waveTab1[SAMPLE_PER_CYCLE]; // 生成的波形数据
 
   /* 波形模式切换按键 */
   const int button = 12; // 波形切换引脚位置
@@ -83,7 +85,7 @@ WAVE_GEN::~WAVE_GEN() {}
 ********************************************************************************/
 void IRAM_ATTR onTimer()
 {
-  if (waveindex >= samplePerCycle)
+  if (waveindex >= SAMPLE_PER_CYCLE)
   {
     waveindex = 0;
   }
@@ -108,9 +110,9 @@ void WAVE_GEN::initTimer()
   /* 将onTimer函数附加到我们的计时器 */
   timerAttachInterrupt(timer, &onTimer, true);
 
-  /* *设置闹钟每秒调用onTimer函数1 tick为1us   => 1秒为1000000us * /
-  / *重复闹钟（第三个参数）*/
-  uint64_t T =  1000000 / (freq * 255);
+  /* 设置闹钟每秒调用onTimer函数1 tick为1us   => 1秒为1000000us * /
+  /* 重复闹钟（第三个参数）*/
+  uint64_t T =  1000000 / (freq * SAMPLE_PER_CYCLE);
   timerAlarmWrite(timer, T, true);
   
   /* 启动定时器 */
@@ -125,7 +127,7 @@ void WAVE_GEN::initTimer()
 void WAVE_GEN::updateTimer()
 {
   timerAlarmDisable(timer);                  //先关闭定时器
-  uint64_t dacTime = 1000000 / (freq * 255); //波形周期,微秒
+  uint64_t dacTime = 1000000 / (freq * SAMPLE_PER_CYCLE); //波形周期,微秒
   /* *设置闹钟每秒调用onTimer函数1 tick为1us => 1秒为1000000us * /
   / *重复闹钟（第三个参数）*/
   timerAlarmWrite(timer, dacTime, true);
@@ -144,43 +146,43 @@ void WAVE_GEN::waveGen(WAVE_TYPE wave_type)
   if (wave_type == SIN)
   {
     double sineValue = 0.0;
-    for (int i = 0; i < samplePerCycle; i++)
+    for (int i = 0; i < SAMPLE_PER_CYCLE; i++)
     {
-      sineValue = sin(((2 * PI) / samplePerCycle) * i) * (uMaxValue / 2) + offSetValue;
-      waveTab1[i] = (((int)(sineValue * 255 / 3.3)));
+      sineValue = sin(((2 * PI) / SAMPLE_PER_CYCLE) * i) * (uMaxValue / 2) + offSetValue;
+      waveTab1[i] = (((int)(sineValue * ADC_MAX_VALUE / ADC_MAX_VOLTAGE)));
     }
     Serial.printf("波形表重设成功，当前为正弦波\n");
   }
   else if (wave_type == SQUARE)
   {
-    float x = samplePerCycle * ((float)duty / 100.0);
+    float x = SAMPLE_PER_CYCLE * ((float)duty / 100.0);
     int x1 = (int)x;
-    for (int i = 0; i < samplePerCycle; i++)
+    for (int i = 0; i < SAMPLE_PER_CYCLE; i++)
     {
       if (i < x)
       {
-        waveTab1[i] = (int)(255 * (uMaxValue / 2 + offSetValue) / 3.3);
+        waveTab1[i] = (int)(ADC_MAX_VALUE * (uMaxValue / 2 + offSetValue) / ADC_MAX_VOLTAGE);
       }
       else
       {
-        waveTab1[i] = (int)(255 * (-(uMaxValue / 2) + offSetValue) / 3.3);
+        waveTab1[i] = (int)(ADC_MAX_VALUE * (-(uMaxValue / 2) + offSetValue) / ADC_MAX_VOLTAGE);
       }
     }
     Serial.printf("波形表重设成功，当前为方波,占空比:%d\n", duty);
   }
   else if (wave_type == SAWTOOTH) //锯齿波
   {
-    for (int i = -127; i < 128; i++)
+    for (int i = -(SAMPLE_PER_CYCLE/2); i < (SAMPLE_PER_CYCLE/2); i++)
     {
-      waveTab1[i + 127] = (int)((i + (offSetValue * 255 / 3.3)) * (uMaxValue / 3.3));
+      waveTab1[i + (SAMPLE_PER_CYCLE/2)] = (int)((i + (offSetValue * ADC_MAX_VALUE / ADC_MAX_VOLTAGE)) * (uMaxValue / ADC_MAX_VOLTAGE));
     }
     Serial.println("波形表重设成功，当前为锯齿波");
   }
-  for (int i = 0; i < samplePerCycle; i++)
+  for (int i = 0; i < SAMPLE_PER_CYCLE; i++)
   {
-    if (waveTab1[i] > 255)
+    if (waveTab1[i] > ADC_MAX_VALUE)
     {
-      waveTab1[i] = 255;
+      waveTab1[i] = ADC_MAX_VALUE;
     }
     if (waveTab1[i] < 0)
     {

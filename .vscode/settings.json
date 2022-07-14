@@ -1,5 +1,6 @@
 {
   "files.associations": {
-    "esp_dsp.h": "c"
+    "esp_dsp.h": "c",
+    "esp32-hal-timer.h": "c"
   }
 }
