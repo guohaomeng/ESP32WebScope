@@ -21,8 +21,8 @@ int sampleStep = 1;
 bool chart_refresh = false;
 
 /* 实例化一个波形发生器 */
-WAVE_TYPE wave_type = SIN;
-WAVE_GEN wave_gen(3.3, 1.65, 50, 10, SIN);
+WAVE_TYPE wave_type = SAWTOOTH;
+WAVE_GEN wave_gen(3.3, 1.65, 50, 100, wave_type);
 
 /* 初始化基于I2S的ADC，默认采样频率8KHz，每次采样16位，ADC精度12位 */
 I2S_ADC i2s_adc(I2S_NUM_0, sampleRate, ADC1_CHANNEL_7, ADC_WIDTH_12Bit);
@@ -207,7 +207,8 @@ void command_loop(void)
       wave_gen.freq = F;
       wave_gen.updateTimer();
     }
-    else{
+    else
+    {
       Serial.printf("频率超出范围0~1.5kHz");
     }
     Serial.printf("%s,%d\n", received_chars, F);
@@ -217,6 +218,10 @@ void command_loop(void)
     int R = atoi(received_chars + 1);
     i2s_adc.set_sample_rate((uint32_t)R);
     Serial.printf("%s,%d\n", received_chars, R);
+  }
+  if (received_chars[0] == 'W') // R指令设置I2S_ADC采样速率
+  {
+    wave_gen.waveSelect();
   }
   //  最后清空串口
   while (Serial.read() >= 0)
