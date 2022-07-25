@@ -15,7 +15,7 @@
 #define MY_WEBSOCKET_H_
 
 #include <Arduino.h>
-#include <WifiClient.h>
+#include <WiFiClient.h>
 #include <vector>
 #include <functional>
 #include "../mycrypto/mycrypto.h"

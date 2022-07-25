@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <script src="./lib/element-plus/vue.js"></script>
+  <!-- import CSS -->
+  <link rel="stylesheet" href="./lib/element-plus/index.css">
+  <link rel="stylesheet" href="./css/main.css">
+  <!-- import JavaScript -->
+  <script src="./lib/element-plus/element-plus.js"></script>
+  <!-- <script src="https://cdn.jsdelivr.net/npm/echarts@5.3.0/dist/echarts.min.js"></script> -->
+  <script src="./js/echarts.js"></script>
+  <script src="./js/webserial.js"></script>
+  <title>SimpleFOC</title>
+  <style>
+
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <el-row>
+      <!-- 左半屏幕 -->
+      <el-col :span="12">
+        <div class="leftMain">
+          <h2>旋转倒立摆控制面板</h3>
+            <!-- 三个卡片,每个卡片一个表单 -->
+            <!-- 卡片一 -->
+            <el-form ref="formRef" :model="form">
+              <el-card class="box-card" style="max-height: 629px;overflow-y: scroll;">
+                <div class="card-header">
+                  <span>无刷电机</span>
+                  <el-button id="connectBtn" class="button" @click="getMotorInfo" type="text">获取参数</el-button>
+                  <el-form-item label="电机通信">
+                    <el-switch v-model="form.value1" class="ml-2" @change="motorConnect" active-color="#13ce66"
+                      inactive-color="#ff4949" />
+                  </el-form-item>
+                </div>
+                <!-- 父手风琴，运动控制设置 -->
+                <div class="text item">
+                  <div class="demo-collapse">
+                    <el-collapse v-model="form.activeName" accordion>
+                      <el-collapse-item title="运动控制设置" name="1">
+                        <el-form-item label="运动控制类型">
+                          <el-select v-model="form.MotorMode" class="m-2" placeholder="Select" size="large">
+                            <el-option label="力矩控制" value="1"></el-option>
+                            <el-option label="速度控制" value="2"></el-option>
+                            <el-option label="角度控制" value="3"></el-option>
+                            <el-option label="力矩开环控制" value="4"></el-option>
+                            <el-option label="速度开环控制" value="5"></el-option>
+                          </el-select>
+                        </el-form-item>
+                        <el-form-item label="力矩控制类型">
+                          <el-select v-model="form.MomentMode" class="m-2" placeholder="Select" size="large">
+                            <el-option label="电压" value="1"></el-option>
+                            <el-option label="DC电流" value="2"></el-option>
+                            <el-option label="FOC电流" value="3"></el-option>
+                          </el-select>
+                        </el-form-item>
+                        <el-form-item label="运动控制频率降采样">
+                          <el-input-number v-model="form.SampleRate" :min="10" :max="100" />
+                        </el-form-item>
+                        <!-- 子手风琴，四个PID设置 -->
+                        <el-collapse v-model="form.activeName2" accordion>
+                          <el-collapse-item title="速度PID" name="11">
+                            <el-form-item label="速度P">
+                              <el-input-number v-model="form.SpeedPID.P" :min="0" :max="100" />
+                            </el-form-item>
+                            <el-form-item label="速度I">
+                              <el-input-number v-model="form.SpeedPID.I" :min="0" :max="100" />
+                            </el-form-item>
+                            <el-form-item label="速度D">
+                              <el-input-number v-model="form.SpeedPID.D" :min="0" :max="100" />
+                            </el-form-item>
+                          </el-collapse-item>
+                          <el-collapse-item title="角度PID" name="12">
+                            <el-form-item label="角度P">
+                              <el-input-number v-model="form.AnglePID.P" :min="0" :max="100" />
+                            </el-form-item>
+                            <el-form-item label="角度I">
+                              <el-input-number v-model="form.AnglePID.I" :min="0" :max="100" />
+                            </el-form-item>
+                            <el-form-item label="角度D">
+                              <el-input-number v-model="form.AnglePID.D" :min="0" :max="100" />
+                            </el-form-item>
+                          </el-collapse-item>
+                          <el-collapse-item title="电流Q PID" name="13">
+                            <el-form-item label="电流Q P">
+                              <el-input-number v-model="form.CurrentQPID.P" :min="0" :max="100" />
+                            </el-form-item>
+                            <el-form-item label="电流Q I">
+                              <el-input-number v-model="form.CurrentQPID.I" :min="0" :max="100" />
+                            </el-form-item>
+                            <el-form-item label="电流Q D">
+                              <el-input-number v-model="form.CurrentQPID.D" :min="0" :max="100" />
+                            </el-form-item>
+                          </el-collapse-item>
+                          <el-collapse-item title="电流D PID" name="14">
+                            <el-form-item label="电流D P">
+                              <el-input-number v-model="form.CurrentDPID.P" :min="0" :max="100" />
+                            </el-form-item>
+                            <el-form-item label="电流D I">
+                              <el-input-number v-model="form.CurrentDPID.I" :min="0" :max="100" />
+                            </el-form-item>
+                            <el-form-item label="电流D D">
+                              <el-input-number v-model="form.CurrentDPID.D" :min="0" :max="100" />
+                            </el-form-item>
+                          </el-collapse-item>
+                        </el-collapse>
+
+                      </el-collapse-item>
+                      <el-collapse-item title="限幅" name="2">
+                        <el-form-item label="速度限幅">
+                          <el-input-number v-model="form.SpeedLimit" :min="0" :max="100" />
+                        </el-form-item>
+                        <el-form-item label="电压限幅">
+                          <el-input-number v-model="form.VoltageLimit" :min="0" :max="100" />
+                        </el-form-item>
+                        <el-form-item label="电流限幅">
+                          <el-input-number v-model="form.CurrentLimit" :min="0" :max="100" />
+                        </el-form-item>
+                      </el-collapse-item>
+                      <el-collapse-item title="状态" name="3">
+                        <el-descriptions title="电机状态" column="2">
+                          <el-descriptions-item label="设定值">2.00</el-descriptions-item>
+                          <el-descriptions-item label="速度 rad/s">0.00</el-descriptions-item>
+                          <el-descriptions-item label="角度/°">0.00</el-descriptions-item>
+                          <el-descriptions-item label=""></el-descriptions-item>
+                          <el-descriptions-item label="电压Q/V">0.00</el-descriptions-item>
+                          <el-descriptions-item label="电流Q/A">0.00</el-descriptions-item>
+                          <el-descriptions-item label="电压D/V">0.00</el-descriptions-item>
+                          <el-descriptions-item label="电流D/A">0.00</el-descriptions-item>
+                        </el-descriptions>
+
+                      </el-collapse-item>
+                    </el-collapse>
+                  </div>
+
+                </div>
+              </el-card>
+            </el-form>
+            <!-- 卡片二 -->
+            <el-form ref="form1" :model="form1">
+              <el-card class="box-card">
+                <div class="card-header">
+                  <span>角度传感器</span>
+                  <el-form-item label="启用更新">
+                    <el-switch v-model="form1.encoderRefresh" class="ml-2" @change="encoderRefresh"
+                      active-color="#13ce66" inactive-color="#ff4949" />
+                  </el-form-item>
+                </div>
+                <div class="angleSensor">
+                  <p>当前角度值：</p>
+                  <span id="angleData">111</span>
+                </div>
+              </el-card>
+            </el-form>
+            <!-- 卡片三 -->
+            <el-form ref="form2" :model="form2">
+              <el-card class="box-card" style="max-height: 465px;overflow-y: scroll;">
+                <div class="card-header">
+                  <span>控制器</span>
+                  <el-form-item label="连接控制器">
+                    <el-switch v-model="form2.controllerConnected" class="ml-2"
+                      @change="controllerConnect(form2.controllerConnected)" active-color="#13ce66"
+                      inactive-color="#ff4949" />
+                  </el-form-item>
+                </div>
+                <div class="text item">
+                  <p>-----------------------------------</p>
+                  <el-form-item label="旋转倒立摆开关">
+                    <el-button type="primary" @click="invertedEN()">启动/停止</el-button>
+                  </el-form-item>
+                  <el-collapse v-model="form2.activeName" accordion>
+                    <el-collapse-item title="旋转倒立摆控制量" name="1">
+                      <el-form-item label="摆杆目标角度">
+                        <el-input-number v-model="form2.targetAngle" @change="updateTargetAngle" :precision="3"
+                          :step="0.001" :min="3.0" :max="3.5" />
+                      </el-form-item>
+                      <el-form-item label="摆杆目标速度">
+                        <el-input-number v-model="form2.targetVelocity" @change="updateTargetVelocity" :precision="1"
+                          :step="0.5" :min="-10" :max="10" />
+                      </el-form-item>
+
+                      </el-form-item>
+                    </el-collapse-item>
+                    <el-collapse-item title="起摆参数调节" name="2">
+                      <el-form-item label="起摆增益K">
+                        <el-input-number v-model="form2.SwingUpK" @change="updateSwingUpK" :precision="3" :step="0.01"
+                          :min="0" :max="2.5" />
+                      </el-form-item>
+                      <el-form-item label="参考能量E0">
+                        <el-input-number v-model="form2.E0"  @change="updateE0" :precision="2" :step="0.01" :min="0"
+                          :max="2" />
+                      </el-form-item>
+
+                      </el-form-item>
+                    </el-collapse-item>
+                    <el-collapse-item title="摆杆位置环PID参数调节" name="3">
+                      <el-form-item label="摆杆位置环P">
+                        <el-input-number v-model="form2.AP" @change="updateAP" :precision="2" :step="0.1" :min="-10"
+                          :max="10" />
+                      </el-form-item>
+                      <el-form-item label="摆杆位置环I">
+                        <el-input-number v-model="form2.AI" @change="updateAI" :precision="2" :step="0.01" :min="-10"
+                          :max="10" />
+                      </el-form-item>
+                      <el-form-item label="摆杆位置环D">
+                        <el-input-number v-model="form2.AD" @change="updateAD" :precision="2" :step="0.1" :min="-50"
+                          :max="50" />
+                      </el-form-item>
+                    </el-collapse-item>
+                    <el-collapse-item title="旋转速度环PID参数调节" name="4">
+                      <el-form-item label="旋转速度环P">
+                        <el-input-number v-model="form2.VP" @change="updateVP" :precision="2" :step="0.1" :min="-10"
+                          :max="10" />
+                      </el-form-item>
+                      <el-form-item label="旋转速度环I">
+                        <el-input-number v-model="form2.VI" @change="updateVI" :precision="3" :step="0.001" :min="-1"
+                          :max="1" />
+                      </el-form-item>
+                      <el-form-item label="旋转速度环D">
+                        <el-input-number v-model="form2.VD" @change="updateVD" :precision="2" :step="0.1" :min="-30"
+                          :max="30" />
+                      </el-form-item>
+                    </el-collapse-item>
+                  </el-collapse>
+                </div>
+              </el-card>
+            </el-form>
+
+        </div>
+      </el-col>
+      <!-- 右半屏幕 -->
+      <el-col :span="12">
+        <div class="rightMain">
+          <h2>实时监控</h2>
+          <div id="echartsMain"></div>
+          <h2>ESP32回显输出 <el-button id="connectBtn2" class="button" @click="clearConsole" type="text">清空</el-button></h2>
+          <div id="console">
+
+          </div>
+        </div>
+      </el-col>
+    </el-row>
+  </div>
+
+  <script>
+    var webSocket = null;
+    var settings = {
+      message: "Hello Element+",
+      form: {
+        value1: false,
+        activeName: '1',  //当前激活手风琴项目的id
+        activeName2: '',  //当前激活的子手风琴项目的id，默认关闭
+        MotorMode: '1',  //当前电机运行模式
+        MomentMode: '1',  //当前电机力矩模式
+        SampleRate: '100',  //运动控制频率降采样率
+        SpeedPID: {
+          P: '0.1',
+          I: '10',
+          D: '0'
+        },
+        AnglePID: {
+          P: '20',
+          I: '0',
+          D: '0'
+        },
+        CurrentQPID: {
+          P: '15',
+          I: '300',
+          D: '0'
+        },
+        CurrentDPID: {
+          P: '15',
+          I: '300',
+          D: '0'
+        },
+        SpeedLimit: '20',
+        VoltageLimit: '15',
+        CurrentLimit: "1",
+        states: {
+          target: '0',
+          VoltageQ: '0',
+          VoltageD: '0',
+          CurrentQ: '0',
+          CurrentD: '0',
+          speed: '',
+          angle: ''
+        }
+      },
+      form1: {
+        encoderRefresh: false,
+      },
+      form2: {
+        controllerConnected: false,
+        en: false,
+        activeName: '1',  //当前激活手风琴项目的id
+        targetAngle: 3.3,
+        targetVelocity: 0.0,
+        SwingUpK: 0.45,
+        E0: 0.13,
+        AP: 3.5,
+        AI: 0.15,
+        AD: 12.5,
+        VP: 0.15,
+        VI: 0.001,
+        VD: 0.0
+      }
+    };
+    const App = {
+      data() {
+        return settings;
+      },
+      methods: {
+        getMotorInfo() {
+
+        },
+        connectMotor() {
+
+        },
+        encoderRefresh(value) {
+          settings.form1.encoderRefresh = value;
+          sendData("RE" + value);
+        },
+        controllerConnect(value) {
+          console.log(value);
+          settings.form2.controllerConnected = value;
+          if (value == true) {  // 启动websocket连接
+            ws_connect();
+          }
+          else {
+            if (ws_connected) {
+              webSocket.close();
+            }
+          }
+        },
+        updateTargetAngle(value) {
+          settings.form2.targetAngle = value;
+          sendData("B" + value);
+        },
+        updateTargetVelocity(value) {
+          //console.log(value);
+          settings.form2.targetVelocity = value;
+          sendData("S" + value);
+        },
+        updateSwingUpK(value) {
+          settings.form2.SwingUpK = value;
+          sendData("K" + value);
+        },
+        updateE0(value) {
+          settings.form2.E0 = value;
+          value = (value/10).toFixed(3);
+          sendData("E" + value);
+        },
+        updateAP(value) {
+          settings.form2.AP = value;
+          sendData("AP" + value);
+        },
+        updateAI(value) {
+          settings.form2.AI = value;
+          value = (value/10).toFixed(3);
+          sendData("AI" + value);
+        },
+        updateAD(value) {
+          settings.form2.AD = value;
+          sendData("AD" + value);
+        },
+        updateVP(value) {
+          settings.form2.VP = value;
+          sendData("VP" + value);
+        },
+        updateVI(value) {
+          settings.form2.VI = value;
+          sendData("VI" + value);
+        },
+        updateVD(value) {
+          settings.form2.VD = value;
+          sendData("VD" + value);
+        },
+        invertedEN() {
+          sendData("EN");
+        },
+        clearConsole(){
+          var consoleText = document.getElementById("console");
+          consoleText.innerHTML = "";
+        }
+      }
+    };
+    const app = Vue.createApp(App);
+    app.use(ElementPlus);
+    app.mount("#app");
+  </script>
+</body>
+<script src="./js/websocket.js"></script>
+<script src="./js/main.js"></script>
+<script src="./js/plotter.js"></script>
+
+</html>

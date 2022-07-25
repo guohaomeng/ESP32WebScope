@@ -1,0 +1,72 @@
+#app{
+  font-size: 16px;
+  font-family: "Consolas", "微软雅黑";
+}
+
+h2 {
+  text-align: center;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+}
+
+.text {
+  font-size: 16px;
+}
+
+.leftMain {
+  width: 100%;
+  height: 100%;
+}
+
+.item {
+  margin-bottom: 18px;
+}
+
+.box-card {
+  width: 47%;
+  float: left;
+  margin: 1%;
+  
+}
+.box-card::-webkit-scrollbar {display:none;}
+#console::-webkit-scrollbar {display:none;}
+.card-header .el-form-item {
+  margin-bottom: 0px;
+}
+
+.el-input-number__decrease {
+  top: 2px;
+}
+
+.el-input-number__increase {
+  top: 2px;
+}
+
+.el-collapse-item__header {
+  font-size: 16px;
+}
+
+/* 右半部分↓ */
+.rightMain {
+  width: 100%;
+  height: 100%;
+}
+
+#echartsMain {
+  width: 750px;
+  height: 400px;
+}
+
+#console {
+  height: 150px;
+  font-size: 16px;
+  font-family: "Consolas", "微软雅黑";
+  overflow-wrap: break-word;
+  overflow-y: scroll;
+  padding: 5px 15px;
+}
