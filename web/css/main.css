@@ -7,11 +7,11 @@ h2 {
   text-align: center;
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: bold;
+.waveGen{
+  width: 70%;
+  height: 100%;
+  text-align: center;
+  margin: 0 auto;
 }
 
 .text {
@@ -27,17 +27,7 @@ h2 {
   margin-bottom: 18px;
 }
 
-.box-card {
-  width: 47%;
-  float: left;
-  margin: 1%;
-  
-}
-.box-card::-webkit-scrollbar {display:none;}
 #console::-webkit-scrollbar {display:none;}
-.card-header .el-form-item {
-  margin-bottom: 0px;
-}
 
 .el-input-number__decrease {
   top: 2px;

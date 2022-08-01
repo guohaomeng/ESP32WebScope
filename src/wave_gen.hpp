@@ -19,7 +19,7 @@
 
 enum WAVE_TYPE
 {
-  SIN,
+  SIN = 1,
   SQUARE,
   SAWTOOTH
 };
@@ -48,16 +48,16 @@ public:
   /* 各种函数，波形发生器相关以及定时器相关的 */
   WAVE_GEN(double uMaxValue, double offSetValue, int duty, unsigned int freq, WAVE_TYPE wave_type);
   ~WAVE_GEN();
-  int set_uMaxValue(double uMaxValue);
-  int set_offSetValue(double offSetValue);
-  int set_duty(int duty);
-  int set_freq(int freq);
+  int set_uMaxValue(double value);
+  int set_offSetValue(double value);
+  int set_duty(int value);
+  int set_freq(int value);
   int set_wave_type(WAVE_TYPE wave_type);
 
   void initTimer();
   void updateTimer();
   void get_waveindex();
-  void waveSelect();
+  void waveSelect(int wave);
   void waveGen(WAVE_TYPE wave_type);
   void adjust_step();
 };
@@ -182,7 +182,7 @@ void WAVE_GEN::waveGen(WAVE_TYPE wave_type)
   {
     for (int i = -(SAMPLE_PER_CYCLE / 2); i < (SAMPLE_PER_CYCLE / 2); i++)
     {
-      waveTab1[i + (SAMPLE_PER_CYCLE / 2)] = (int)((i + (offSetValue * ADC_MAX_VALUE / ADC_MAX_VOLTAGE)) * (uMaxValue / ADC_MAX_VOLTAGE));
+      waveTab1[i + (SAMPLE_PER_CYCLE / 2)] = (int)(i * (uMaxValue / ADC_MAX_VOLTAGE) + (offSetValue * ADC_MAX_VALUE / ADC_MAX_VOLTAGE));
     }
     Serial.println("波形表重设成功，当前为锯齿波");
   }
@@ -216,15 +216,74 @@ void WAVE_GEN::adjust_step()
   }
 }
 
-void WAVE_GEN::waveSelect()
+void WAVE_GEN::waveSelect(int wave)
 {
-  wave_type = (enum WAVE_TYPE)(wave_type + 1);
-  if (wave_type > 2)
+  if (wave < 1 || wave > 3)
   {
-    wave_type = SIN;
+    Serial.println("波形种类设置错误");
+    return;
   }
+  wave_type = (enum WAVE_TYPE)(wave);
   waveGen(wave_type);
-  delay(100);
+}
+
+int WAVE_GEN::set_uMaxValue(double value)
+{
+  if (value >= 0 && value <= 3.3)
+  {
+    uMaxValue = value;
+    waveGen(wave_type);
+    return 0;
+  }
+  else
+  {
+    Serial.println("峰峰值设置超出范围0-3.3V");
+    return -1;
+  }
+}
+int WAVE_GEN::set_offSetValue(double value)
+{
+  if (value >= 0 && value <= 3.3)
+  {
+    offSetValue = value;
+    waveGen(wave_type);
+    return 0;
+  }
+  else
+  {
+    Serial.println("偏置电压设置超出范围0-3.3V");
+    return -1;
+  }
+}
+int WAVE_GEN::set_duty(int value)
+{
+  if (value >= 0 && value <= 100)
+  {
+    duty = value;
+    waveGen(wave_type);
+    return 0;
+  }
+  else
+  {
+    Serial.println("占空比设置超出范围0-100");
+    return -1;
+  }
+}
+int WAVE_GEN::set_freq(int value)
+{
+  if (value > 0 && value <= 1500)
+  {
+    freq_old = freq;
+    freq = value;
+    if (freq != freq_old)
+      updateTimer();
+    return 0;
+  }
+  else
+  {
+    Serial.println("频率设置超出范围0~1.5kHz");
+    return -1;
+  }
 }
 
 #endif

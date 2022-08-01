@@ -2,89 +2,123 @@
 <html lang="zh-CN">
 
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="./lib/element-plus/vue.js"></script>
-    <!-- import CSS -->
-    <link rel="stylesheet" href="./lib/element-plus/index.css">
-    <link rel="stylesheet" href="./css/main.css">
-    <!-- import JavaScript -->
-    <script src="./lib/element-plus/element-plus.js"></script>
-    <script src="./js/echarts.js"></script>
-    <title>波形发生器</title>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="./lib/element-plus/vue3.js"></script>
+  <!-- import CSS -->
+  <link rel="stylesheet" href="./lib/element-plus/index.css">
+  <link rel="stylesheet" href="./css/main.css">
+  <!-- import JavaScript -->
+  <script src="./lib/element-plus/element-plus.js"></script>
+  <script src="./js/echarts.js"></script>
+  <title>波形发生器</title>
 </head>
 
 <body>
-    <div id="app">
-        <el-row>
-            <!-- 左半屏幕 -->
-            <el-col :span="12">
-                <div class="leftMain">
-                    <h2>波形发生器控制面板</h3>
-                    <el-form ref="formRef" :model="form">
-                    
-                    </el-form>
-                </div>
-            </el-col>
-            <!-- 右半屏幕 -->
-            <el-col :span="12">
-                <div class="rightMain">
-                    <h2>示波器</h2>
-                    <div id="echartsMain"></div>
-                    <h2>ESP32回显输出 <el-button id="connectBtn2" class="button" @click="clearConsole" type="text">清空
-                        </el-button>
-                    </h2>
-                    <div id="console">
+  <div id="app">
+    <el-row>
+      <!-- 左半屏幕 -->
+      <el-col :span="12">
+        <div class="leftMain">
+          <h2>波形发生器控制面板</h3>
+            <div class="waveGen">
+              <!-- 表单1 -->
+              <el-form ref="form" :model="form" :size="large" label-width="120px">
+                <el-form-item label="波形选择">
+                  <el-select v-model="form.waveType" placeholder="请选择波形">
+                    <el-option label="正弦波" value="1"></el-option>
+                    <el-option label="方波" value="2"></el-option>
+                    <el-option label="锯齿波" value="3"></el-option>
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="频率">
+                  <el-input-number v-model="form.freq" @change="freqChange" :min="1" :max="1500" label="频率">
+                  </el-input-number>
+                </el-form-item>
+                <el-form-item label="占空比">
+                  <el-input-number v-model="form.duty" @change="dutyChange" :min="1" :max="99" label="占空比">
+                  </el-input-number>
+                </el-form-item>
+                <el-form-item label="峰峰值">
+                  <el-input-number v-model="form.uMaxValue" @change="uMaxValueChange" :min="0" :max="3.3" :precision="2"
+                    :step="0.2" label="峰峰值"></el-input-number>
+                </el-form-item>
+                <el-form-item label="偏置电压">
+                  <el-input-number v-model="form.biasVoltage " @change="biasChange" :min="0" :max="3.3" :precision="2"
+                    :step="0.2" label="频率"></el-input-number>
+                </el-form-item>
+                <el-form-item>
+                  <el-button type="primary" @click="onSubmit" style="width: 30%; margin-right: 10%;">立即设置</el-button>
+                  <el-button type="reset" style="width: 30%; margin-left: 0%;">取消</el-button>
+                </el-form-item>
+              </el-form>
+            </div>
+        </div>
+      </el-col>
+      <!-- 右半屏幕 -->
+      <el-col :span="12">
+        <div class="rightMain">
+          <h2>示波器</h2>
+          <div id="echartsMain"></div>
+          <h2>ESP32回显输出 <el-button id="connectBtn2" class="button" @click="clearConsole" type="text">清空
+            </el-button>
+          </h2>
+          <div id="console">
 
-                    </div>
-                </div>
-            </el-col>
-        </el-row>
-    </div>
+          </div>
+        </div>
+      </el-col>
+    </el-row>
+  </div>
 
-    <script>
-        var webSocket = null;
-        var settings = {
-            message: "Hello Element+",
-            form: {
-                value1: false,
-                activeName: '1',  //当前激活手风琴项目的id
-                activeName2: '',  //当前激活的子手风琴项目的id，默认关闭
-                MotorMode: '1',  //当前电机运行模式
-                MomentMode: '1'  //当前电机力矩模式
-            },
-            form1: {
-                encoderRefresh: false,
+  <script>
+    var webSocket = null;
+    var settings = {
+      message: "Hello Element+",
+      form: {
+        waveType:"1",
+        freq:100,
+        duty: 50,
+        uMaxValue:3.3,
+        biasVoltage:1.65,
+        value1: false,
+        activeName: '1',  //当前激活手风琴项目的id
+        activeName2: '',  //当前激活的子手风琴项目的id，默认关闭
+        MotorMode: '1',  //当前电机运行模式
+        MomentMode: '1'  //当前电机力矩模式
+      },
+      form1: {
+        encoderRefresh: false,
+      }
+    };
+    const App = {
+      data() {
+        return settings;
+      },
+      methods: {
+        controllerConnect(value) {
+          console.log(value);
+          settings.form2.controllerConnected = value;
+          if (value == true) {  // 启动websocket连接
+            ws_connect();
+          }
+          else {
+            if (ws_connected) {
+              webSocket.close();
             }
-        };
-        const App = {
-            data() {
-                return settings;
-            },
-            methods: {
-                controllerConnect(value) {
-                    console.log(value);
-                    settings.form2.controllerConnected = value;
-                    if (value == true) {  // 启动websocket连接
-                        ws_connect();
-                    }
-                    else {
-                        if (ws_connected) {
-                            webSocket.close();
-                        }
-                    }
-                },
-                clearConsole() {
-                    var consoleText = document.getElementById("console");
-                    consoleText.innerHTML = "";
-                }
-            }
-        };
-        const app = Vue.createApp(App);
-        app.use(ElementPlus);
-        app.mount("#app");
-    </script>
+          }
+        },
+        clearConsole() {
+          var consoleText = document.getElementById("console");
+          consoleText.innerHTML = "";
+        }
+      }
+    };
+    const app = Vue.createApp(App);
+    app.use(ElementPlus);
+    app.mount("#app");
+  </script>
 </body>
 
 </html>
