@@ -122,7 +122,7 @@ int I2S_ADC::get_adc_data(float *po_AdcValues, int length, int step)
     {
       if (j < length)
         po_AdcValues[j] = adcBuff[i];
-      j+=step;
+      j += step;
     }
   }
   is_sample = false;
@@ -150,13 +150,16 @@ bool I2S_ADC::set_sample_rate(uint32_t rate)
   sample_rate_old = sample_rate;
   sample_rate = rate;
   esp_err_t ret;
-  while (is_sample == false)
+  while (1)
   {
-    i2s_stop(i2s_num);
-    ret = i2s_set_sample_rates(i2s_num, rate);
-    break;
+    if (is_sample == false)
+    {
+      ret = i2s_set_sample_rates(i2s_num, rate);
+      break;
+    }
+    // 不加延时程序会死循环最后触发看门狗重启
+    vTaskDelay(2 / portTICK_PERIOD_MS);
   }
-  i2s_start(i2s_num);
   is_change_rate = false;
   // ESP_ERROR_CHECK(i2s_set_sample_rates(i2s_num, rate));
   return (ret == ESP_OK) ? true : false;

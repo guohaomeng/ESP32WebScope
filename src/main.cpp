@@ -44,11 +44,11 @@ void command_loop2(char *received_chars);
 void Task2(void *arg)
 {
   int k = 0;
-  vTaskDelay(500 / portTICK_PERIOD_MS);
+  vTaskDelay(50 / portTICK_PERIOD_MS);
   while (true)
   {
     server.loop();
-    if (k >= 10)
+    if (k >= 30)
     {
       k = 0;
       String str = "{\"a\":[";
@@ -63,7 +63,7 @@ void Task2(void *arg)
       }
     }
     k++;
-    vTaskDelay(30 / portTICK_PERIOD_MS);
+    vTaskDelay(10 / portTICK_PERIOD_MS);
   }
   vTaskDelete(NULL);
 }
@@ -83,7 +83,7 @@ void setup()
   Serial.println("websocket初始化成功");
   /* 创建任务2，建立并保持与上位机的通信 */
   xTaskCreatePinnedToCore(Task2, "Task2", 24 * 4096, NULL, 1, NULL, 0);
-  vTaskDelay(500 / portTICK_PERIOD_MS);
+  vTaskDelay(50 / portTICK_PERIOD_MS);
 }
 /*******************************************************************************
 ****函数功能: loop函数
@@ -100,7 +100,7 @@ void loop()
   //   Serial.printf("adc:%d,%.3f\n", i, ADC_sample[i]);
   // }
   command_loop();
-  vTaskDelay(50 / portTICK_PERIOD_MS);
+  vTaskDelay(45 / portTICK_PERIOD_MS);
 }
 
 /*******************************************************************************
