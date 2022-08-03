@@ -138,8 +138,8 @@ bool websocket_init()
               client->setID(payload[2]);
               client1 = client;
             }
-            command_loop2(received_chars);
             client->send(String(received_chars));
+            command_loop2(received_chars);
           }
           else if (type == myWebSocket::TYPE_BIN)
           {
@@ -149,12 +149,10 @@ bool websocket_init()
           }
           else if (type == myWebSocket::WS_DISCONNECTED)
           {
-
             Serial.println("Websocket disconnected.");
           }
           else if (type == myWebSocket::WS_CONNECTED)
           {
-
             Serial.println("Websocket connected.");
           }
         }
@@ -288,5 +286,12 @@ void command_loop2(char *received_chars)
   if (received_chars[0] == 'C' && received_chars[1] == 'F')
   { // CF停止发送采样数据
     chart_refresh = false;
+  }
+  if (received_chars[0] == 'G' && received_chars[1] == 'P')
+  { // GP指令获取波形发生器全部参数
+    if (client1 != nullptr)
+    { /* 向上位机发送数据 */
+      client1->send(wave_gen.get_param());
+    }
   }
 }

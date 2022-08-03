@@ -37,6 +37,7 @@ public:
   int duty = 50;                  //占空比%(方波)
   WAVE_TYPE wave_type = SAWTOOTH; //波形种类
   unsigned int freq = 100;        // 频率
+  String param = "";
 
   unsigned int freq_old = 100;        // 上一次的频率
   uint8_t waveTab1[SAMPLE_PER_CYCLE]; // 生成的波形数据
@@ -53,6 +54,7 @@ public:
   int set_duty(int value);
   int set_freq(int value);
   int set_wave_type(WAVE_TYPE wave_type);
+  String get_param();
 
   void initTimer();
   void updateTimer();
@@ -284,6 +286,24 @@ int WAVE_GEN::set_freq(int value)
     Serial.println("频率设置超出范围0~1.5kHz");
     return -1;
   }
+}
+
+String WAVE_GEN::get_param()
+{
+  param = "";
+  /* 发送如下格式字符串 {"param":{"U":3.3,"B":1.65,"D":50,"F":100,"W":1}} */
+  param += "{\"param\":{\"U\":";
+  param += String(uMaxValue);
+  param += String(",\"B\":");
+  param += String(offSetValue);
+  param += String(",\"D\":");
+  param += String(duty);
+  param += String(",\"F\":");
+  param += String(freq);
+  param += String(",\"W\":");
+  param += String((int)wave_type);
+  param += String("}}");
+  return param;
 }
 
 #endif
