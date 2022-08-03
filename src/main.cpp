@@ -139,7 +139,7 @@ bool websocket_init()
               client1 = client;
             }
             command_loop2(received_chars);
-            // client->send(String(received_chars));
+            client->send(String(received_chars));
           }
           else if (type == myWebSocket::TYPE_BIN)
           {
