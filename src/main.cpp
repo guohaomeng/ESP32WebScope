@@ -271,7 +271,8 @@ void command_loop2(char *received_chars)
   if (received_chars[0] == 'R') // R指令设置I2S_ADC采样速率
   {
     uint32_t R = atoi(received_chars + 1);
-    i2s_adc.set_sample_rate(R);
+    if(i2s_adc.set_sample_rate(R))
+      wave_gen.sample_rate = R;
     Serial.printf("%s,%d\n", received_chars, R);
   }
   if (received_chars[0] == 'W') // W指令设置波形

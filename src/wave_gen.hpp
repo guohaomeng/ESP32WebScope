@@ -42,6 +42,8 @@ public:
   unsigned int freq_old = 100;        // 上一次的频率
   uint8_t waveTab1[SAMPLE_PER_CYCLE]; // 生成的波形数据
 
+  uint32_t sample_rate = 8000;       // i2s_adc的采样速度，仅用于发送
+
   /* 波形模式切换按键 */
   const int button = 12; // 波形切换引脚位置
   char received_data[5] = {0};
@@ -291,7 +293,7 @@ int WAVE_GEN::set_freq(int value)
 String WAVE_GEN::get_param()
 {
   param = "";
-  /* 发送如下格式字符串 {"param":{"U":3.3,"B":1.65,"D":50,"F":100,"W":1}} */
+  /* 发送如下格式字符串 {"param":{"U":3.3,"B":1.65,"D":50,"F":100,"R":8000,"W":1}} */
   param += "{\"param\":{\"U\":";
   param += String(uMaxValue);
   param += String(",\"B\":");
@@ -300,6 +302,8 @@ String WAVE_GEN::get_param()
   param += String(duty);
   param += String(",\"F\":");
   param += String(freq);
+  param += String(",\"R\":");
+  param += String(sample_rate);
   param += String(",\"W\":");
   param += String((int)wave_type);
   param += String("}}");
