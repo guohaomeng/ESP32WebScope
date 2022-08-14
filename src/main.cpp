@@ -10,11 +10,13 @@
 #include <Arduino.h>
 #include "mywebsocket/mywebsocket.h"
 #include <WiFi.h>
+#include <FS.h>
 #include <SPIFFS.h>
 
 #include "i2s_adc.hpp"
 #include "wave_gen.hpp"
 
+#define FORMAT_SPIFFS_IF_FAILED true
 #define ADC_SAMPLE_SIZE 256
 float ADC_sample[ADC_SAMPLE_SIZE];
 uint32_t sampleRate = 2000; // 根据实测，真实的I2S采样频率应为此值的一半
@@ -36,6 +38,7 @@ myWebSocket::WebSocketClient *client1 = nullptr;
 bool websocket_init();
 void command_loop(void);
 void command_loop2(char *received_chars);
+void readFile(fs::FS &fs, const char *path);
 /*******************************************************************************
 ****函数功能: 核心0上运行的任务2，运行websocket服务器与http服务器，与上位机通过WiFi进行通信
 ****入口参数: *arg:
@@ -77,6 +80,12 @@ void setup()
 {
   Serial.begin(115200);
 
+  if (!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED))
+  {
+    Serial.println("SPIFFS Mount Failed");
+    return;
+  }
+  readFile(SPIFFS, "/index.html");
   /* 初始化波形发生器 */
   wave_gen.initTimer();
   Serial.println("波形发生器初始化成功");
@@ -277,7 +286,7 @@ void command_loop2(char *received_chars)
   if (received_chars[0] == 'R') // R指令设置I2S_ADC采样速率
   {
     uint32_t R = atoi(received_chars + 1);
-    if(i2s_adc.set_sample_rate(R))
+    if (i2s_adc.set_sample_rate(R))
       wave_gen.sample_rate = R;
     Serial.printf("%s,%d\n", received_chars, R);
   }
@@ -301,4 +310,23 @@ void command_loop2(char *received_chars)
       client1->send(wave_gen.get_param());
     }
   }
+}
+
+void readFile(fs::FS &fs, const char *path)
+{
+  Serial.printf("Reading file: %s\r\n", path);
+
+  File file = fs.open(path);
+  if (!file || file.isDirectory())
+  {
+    Serial.println("- failed to open file for reading");
+    return;
+  }
+
+  Serial.println("- read from file:");
+  while (file.available())
+  {
+    Serial.write(file.read());
+  }
+  file.close();
 }
