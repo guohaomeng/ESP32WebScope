@@ -10,6 +10,7 @@
 #include <Arduino.h>
 #include "mywebsocket/mywebsocket.h"
 #include <WiFi.h>
+#include <SPIFFS.h>
 
 #include "i2s_adc.hpp"
 #include "wave_gen.hpp"
@@ -54,7 +55,7 @@ void Task2(void *arg)
       String str = "{\"a\":[";
       for (int i = 0; i < ADC_SAMPLE_SIZE - 1; i++)
       {
-        str += String(ADC_sample[i]) + String(",");
+        str += (String(ADC_sample[i]) + String(","));
       }
       str += (String(ADC_sample[ADC_SAMPLE_SIZE - 1]) + String("]}"));
       if (client1 != nullptr && chart_refresh == true)
