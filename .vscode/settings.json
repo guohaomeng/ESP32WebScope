@@ -1,6 +1,13 @@
 {
   "files.associations": {
     "esp_dsp.h": "c",
-    "esp32-hal-timer.h": "c"
+    "esp32-hal-timer.h": "c",
+    "new": "cpp",
+    "optional": "cpp",
+    "random": "cpp",
+    "limits": "cpp",
+    "*.tcc": "cpp",
+    "cmath": "cpp",
+    "utility": "cpp"
   }
 }

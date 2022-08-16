@@ -1,5 +1,5 @@
 /*******************************************************************************
-****文件路径         : \ESP32WebScope\src\wave_gen.hpp
+****文件路径         : /ESP32WebScope/src/wave_gen.hpp
 ****作者名称         : guohaomeng
 ****文件版本         : V1.0.0
 ****创建日期         : 2022-07-01 11:43:37
@@ -19,7 +19,7 @@
 
 enum WAVE_TYPE
 {
-  SIN,
+  SIN = 1,
   SQUARE,
   SAWTOOTH
 };
@@ -37,9 +37,12 @@ public:
   int duty = 50;                  //占空比%(方波)
   WAVE_TYPE wave_type = SAWTOOTH; //波形种类
   unsigned int freq = 100;        // 频率
+  String param = "";
 
   unsigned int freq_old = 100;        // 上一次的频率
   uint8_t waveTab1[SAMPLE_PER_CYCLE]; // 生成的波形数据
+
+  uint32_t sample_rate = 8000;       // i2s_adc的采样速度，仅用于发送
 
   /* 波形模式切换按键 */
   const int button = 12; // 波形切换引脚位置
@@ -48,16 +51,17 @@ public:
   /* 各种函数，波形发生器相关以及定时器相关的 */
   WAVE_GEN(double uMaxValue, double offSetValue, int duty, unsigned int freq, WAVE_TYPE wave_type);
   ~WAVE_GEN();
-  int set_uMaxValue(double uMaxValue);
-  int set_offSetValue(double offSetValue);
-  int set_duty(int duty);
-  int set_freq(int freq);
+  int set_uMaxValue(double value);
+  int set_offSetValue(double value);
+  int set_duty(int value);
+  int set_freq(int value);
   int set_wave_type(WAVE_TYPE wave_type);
+  String get_param();
 
   void initTimer();
   void updateTimer();
   void get_waveindex();
-  void waveSelect();
+  void waveSelect(int wave);
   void waveGen(WAVE_TYPE wave_type);
   void adjust_step();
 };
@@ -182,7 +186,7 @@ void WAVE_GEN::waveGen(WAVE_TYPE wave_type)
   {
     for (int i = -(SAMPLE_PER_CYCLE / 2); i < (SAMPLE_PER_CYCLE / 2); i++)
     {
-      waveTab1[i + (SAMPLE_PER_CYCLE / 2)] = (int)((i + (offSetValue * ADC_MAX_VALUE / ADC_MAX_VOLTAGE)) * (uMaxValue / ADC_MAX_VOLTAGE));
+      waveTab1[i + (SAMPLE_PER_CYCLE / 2)] = (int)(i * (uMaxValue / ADC_MAX_VOLTAGE) + (offSetValue * ADC_MAX_VALUE / ADC_MAX_VOLTAGE));
     }
     Serial.println("波形表重设成功，当前为锯齿波");
   }
@@ -200,7 +204,11 @@ void WAVE_GEN::waveGen(WAVE_TYPE wave_type)
     // Serial.printf("wave:%d\n", waveTab[i]);
   }
 }
-
+/*******************************************************************************
+****函数功能: 根据频率自动切换跳跃步长
+****出口参数: 无
+****函数备注: 0-100hz时256个数全部依次输出，100-200hz隔一个输出一个，200-300隔2个输出一个···
+********************************************************************************/
 void WAVE_GEN::adjust_step()
 {
   if (freq > 0 && freq <= 100)
@@ -215,16 +223,127 @@ void WAVE_GEN::adjust_step()
   {
   }
 }
-
-void WAVE_GEN::waveSelect()
+/*******************************************************************************
+****函数功能: 波形切换函数
+****入口参数: wave:波形种类
+****出口参数: 无
+****函数备注: 无
+********************************************************************************/
+void WAVE_GEN::waveSelect(int wave)
 {
-  wave_type = (enum WAVE_TYPE)(wave_type + 1);
-  if (wave_type > 2)
+  if (wave < 1 || wave > 3)
   {
-    wave_type = SIN;
+    Serial.println("波形种类设置错误");
+    return;
   }
+  wave_type = (enum WAVE_TYPE)(wave);
   waveGen(wave_type);
-  delay(100);
+}
+/*******************************************************************************
+****函数功能: 设置波形发生器峰峰值
+****入口参数: value:峰峰值大小
+****出口参数: 0:设置成功 -1:超出范围
+****函数备注: 无
+********************************************************************************/
+int WAVE_GEN::set_uMaxValue(double value)
+{
+  if (value >= 0 && value <= 3.3)
+  {
+    uMaxValue = value;
+    waveGen(wave_type);
+    return 0;
+  }
+  else
+  {
+    Serial.println("峰峰值设置超出范围0-3.3V");
+    return -1;
+  }
+}
+/*******************************************************************************
+****函数功能: 设置波形发生器偏置电压
+****入口参数: value:偏置电压大小
+****出口参数: 0:设置成功 -1:超出范围
+****函数备注: 无
+********************************************************************************/
+int WAVE_GEN::set_offSetValue(double value)
+{
+  if (value >= 0 && value <= 3.3)
+  {
+    offSetValue = value;
+    waveGen(wave_type);
+    return 0;
+  }
+  else
+  {
+    Serial.println("偏置电压设置超出范围0-3.3V");
+    return -1;
+  }
+}
+/*******************************************************************************
+****函数功能: 设置波形发生器方波占空比
+****入口参数: value:占空比大小
+****出口参数: 0:设置成功 -1:超出范围
+****函数备注: 无
+********************************************************************************/
+int WAVE_GEN::set_duty(int value)
+{
+  if (value >= 0 && value <= 100)
+  {
+    duty = value;
+    waveGen(wave_type);
+    return 0;
+  }
+  else
+  {
+    Serial.println("占空比设置超出范围0-100");
+    return -1;
+  }
+}
+/*******************************************************************************
+****函数功能: 设置波形发生器信号频率
+****入口参数: value:频率值
+****出口参数: 0:设置成功 -1:超出范围
+****函数备注: 无
+********************************************************************************/
+int WAVE_GEN::set_freq(int value)
+{
+  if (value > 0 && value <= 1500)
+  {
+    freq_old = freq;
+    freq = value;
+    if (freq != freq_old)
+      updateTimer();
+    return 0;
+  }
+  else
+  {
+    Serial.println("频率设置超出范围0~1.5kHz");
+    return -1;
+  }
+}
+/*******************************************************************************
+****函数功能: 获取波形发生器参数
+****出口参数: 无
+****函数备注: json格式，便于上位机解析
+********************************************************************************/
+String WAVE_GEN::get_param()
+{
+  param = "";
+  /* 发送如下格式字符串 {"param":{"U":3.3,"B":1.65,"D":50,"F":100,"R":8000,"W":1}} */
+  param += "{\"param\":{\"U\":";
+  param += String(uMaxValue);
+  param += String(",\"B\":");
+  param += String(offSetValue);
+  param += String(",\"D\":");
+  param += String(duty);
+  param += String(",\"F\":");
+  param += String(freq);
+  param += String(",\"R\":");
+  param += String(sample_rate);
+  param += String(",\"W\":");
+  param += String((int)wave_type);
+  param += String("}}");
+  return param;
 }
 
 #endif

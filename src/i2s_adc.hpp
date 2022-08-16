@@ -1,5 +1,5 @@
 /*******************************************************************************
-****文件路径         : \ESP32WebScope\src\i2s_adc.hpp
+****文件路径         : /ESP32WebScope/src/i2s_adc.hpp
 ****作者名称         : guohaomeng
 ****文件版本         : V1.0.0
 ****创建日期         : 2022-07-14 10:43:39
@@ -22,13 +22,15 @@ public:
   adc1_channel_t channel = ADC1_CHANNEL_7;
   adc_bits_width_t width_bit = ADC_WIDTH_12Bit;
   uint32_t sample_rate = 8000;
+  uint32_t sample_rate_old = 8000;
+  bool is_sample = false;
+  bool is_change_rate = false;
   i2s_config_t i2s_config = {
       // I2S with ADC
       .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_ADC_BUILT_IN),
       .sample_rate = sample_rate,
       .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
       .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT,
-      .communication_format = I2S_COMM_FORMAT_I2S_MSB,
       .intr_alloc_flags = 0,
       .dma_buf_count = 4,
       .dma_buf_len = NUM_SAMPLES, // 缓冲区大小 = dma_buf_len * chan_num * bits_per_chan / 8 = NUM_SAMPLES * 1 * 16 / 8 = 2048字节
@@ -58,7 +60,6 @@ I2S_ADC::I2S_ADC()
       .sample_rate = (8000),
       .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
       .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT,
-      .communication_format = I2S_COMM_FORMAT_I2S_MSB,
       .intr_alloc_flags = 0,
       .dma_buf_count = 4,
       .dma_buf_len = NUM_SAMPLES,
@@ -107,6 +108,7 @@ int I2S_ADC::get_adc_data(float *po_AdcValues, int length, int step)
 {
   // uint16_t *i2s_read_buff = malloc(sizeof(uint16_t) * NUM_SAMPLES*2);
   // uint16_t i2s_read_buff[NUM_SAMPLES*2];
+  is_sample = true;
   size_t num_bytes_read = 0;
 
   i2s_read(I2S_NUM_0, (void *)i2s_read_buff, NUM_SAMPLES * 2 * sizeof(uint16_t), &num_bytes_read, portMAX_DELAY);
@@ -120,13 +122,18 @@ int I2S_ADC::get_adc_data(float *po_AdcValues, int length, int step)
     {
       if (j < length)
         po_AdcValues[j] = adcBuff[i];
-      j+=step;
+      j += step;
     }
   }
+  is_sample = false;
   // free(i2s_read_buff);
   return NumSamps; // 返回读取的样本数
 }
-
+/*******************************************************************************
+****函数功能: 重置i2s_adc外设
+****出口参数: 无
+****函数备注: 无
+********************************************************************************/
 void I2S_ADC::i2s_reset()
 {
   i2s_driver_uninstall(i2s_num);
@@ -136,16 +143,34 @@ void I2S_ADC::i2s_reset()
   i2s_set_adc_mode(ADC_UNIT_1, channel);
   i2s_adc_enable(i2s_num);
 }
-
+/*******************************************************************************
+****函数功能: 设置示波器采样率
+****入口参数: rate:示波器采样率，实测真实采样率为此值的一半
+****出口参数: true:成功 false:失败
+****函数备注: 无
+********************************************************************************/
 bool I2S_ADC::set_sample_rate(uint32_t rate)
 {
   if (rate > 128000 || rate < 1000)
   {
     return false;
   }
-  this->sample_rate = rate;
+  is_change_rate = true;
+  sample_rate_old = sample_rate;
+  sample_rate = rate;
+  esp_err_t ret;
+  while (1)
+  {
+    if (is_sample == false)
+    {
+      ret = i2s_set_sample_rates(i2s_num, rate);
+      break;
+    }
+    // 不加延时程序会死循环最后触发看门狗重启
+    vTaskDelay(2 / portTICK_PERIOD_MS);
+  }
+  is_change_rate = false;
   // ESP_ERROR_CHECK(i2s_set_sample_rates(i2s_num, rate));
-  esp_err_t ret = i2s_set_sample_rates(i2s_num, rate);
   return (ret == ESP_OK) ? true : false;
 }
 
