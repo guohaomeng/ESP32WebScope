@@ -902,7 +902,10 @@ namespace myWebSocket
                             String res = "HTTP/1.1 " + String(this->nonWebSocketRequests.at(index)->code ? this->nonWebSocketRequests.at(index)->code : 200) + " OK\r\n";
                             res += "Content-Type: " + mimeTypeTmp + "\r\n";
                             res += "Connection: keep-alive\r\n";
-                            res += "Content-Encoding: gzip\r\n";
+                            if(path.endsWith(".gz"))
+                              res += "Content-Encoding: gzip\r\n";
+                            res += "Cache-Control: no-cache\r\n";
+                            res += "Access-Control-Allow-Origin: *\r\n";
                             res += "Transfer-Encoding: chunked\r\n\r\n";
                             client->print(res);
                         }

@@ -31,13 +31,13 @@
 #define MY_WEBSOCKET_CLIENT_MAX_PAYLOAD_LENGTH 102400
 
 // buffer length for websocket handshake
-#define MY_WEBSOCKET_BUFFER_LENGTH 1024
+#define MY_WEBSOCKET_BUFFER_LENGTH 2048
 
 // http post body length
-#define MY_WEBSOCKET_HTTP_POST_LENGTH 1024
+#define MY_WEBSOCKET_HTTP_POST_LENGTH 2048
 
 // http header length
-#define MY_WEBSOCKET_MAX_HEADER_LENGTH 1024
+#define MY_WEBSOCKET_MAX_HEADER_LENGTH 2048
 
 // client length
 #define MAX_CLIENTS 10
@@ -410,7 +410,7 @@ namespace myWebSocket
         // of html/js/css...
         // otherwise you could process raw data in callback
         // edit your own response header or something
-        bool autoFillHttpResponseHeader = true;
+        bool autoFillHttpResponseHeader = false;
 
         uint8_t *headerBuffer = new uint8_t[MY_WEBSOCKET_MAX_HEADER_LENGTH];
         int isWebSocketClientArrayHasFreeSapce();

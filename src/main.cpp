@@ -38,7 +38,7 @@ myWebSocket::WebSocketClient *client1 = nullptr;
 bool websocket_init();
 void command_loop(void);
 void command_loop2(char *received_chars);
-void readFile(fs::FS &fs, const char *path);
+int streamFile(const String &filePath, myWebSocket::ExtendedWiFiClient *client, const String &mimeType);
 /*******************************************************************************
 ****函数功能: 核心0上运行的任务2，运行websocket服务器与http服务器，与上位机通过WiFi进行通信
 ****入口参数: *arg:
@@ -85,7 +85,7 @@ void setup()
     Serial.println("SPIFFS Mount Failed");
     return;
   }
-  readFile(SPIFFS, "/index.html");
+  // readFile(SPIFFS, "/index.html.gz");
   /* 初始化波形发生器 */
   wave_gen.initTimer();
   Serial.println("波形发生器初始化成功");
@@ -172,23 +172,54 @@ bool websocket_init()
       "/",
       [](myWebSocket::ExtendedWiFiClient *client, myWebSocket::HttpMethod method, uint8_t *data, uint64_t len)
       {
+        // 先发送响应头 header
+        String header = "HTTP/1.1 200 OK\r\n";
+        header += (String("Content-Type: text/html;charset=utf-8\r\n"));
+        header += "Connection: keep-alive\r\n";
+        header += "Cache-Control: no-cache\r\n";
+        header += "Access-Control-Allow-Origin: *\r\n";
+        header += "Transfer-Encoding: chunked\r\n\r\n";
+        client->print(header);
         client->send(R"(
 <!DOCTYPE html>
-<html>
-
-<head>
-  <title>ESP32 Combined Server</title>
-</head>
-
-<body>
-  <h1>Hello World!</h1>
-
-</body>
-
+<html lang="zh-CN" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ESP32WebScope</title>
+    <script type="module" crossorigin src="./js/index.js.gz"></script>
+    <link rel="stylesheet" href="./css/index.css.gz">
+  </head>
+  <body style="margin: 0;">
+    <div id="app"></div>
+    
+  </body>
 </html>
 )");
         client->close();
-      });
+      },
+      "text/html;charset=utf-8");
+  server.on(
+      "/index.html.gz",
+      [](myWebSocket::ExtendedWiFiClient *client, myWebSocket::HttpMethod method, uint8_t *data, uint64_t len)
+      {
+        streamFile("/index.html.gz", client, "text/html");
+      },
+      "text/html");
+  server.on(
+      "/css/index.css.gz",
+      [](myWebSocket::ExtendedWiFiClient *client, myWebSocket::HttpMethod method, uint8_t *data, uint64_t len)
+      {
+        streamFile("/css/index.css.gz", client, "text/css");
+      },
+      "text/css");
+  server.on(
+      "/js/index.js.gz",
+      [](myWebSocket::ExtendedWiFiClient *client, myWebSocket::HttpMethod method, uint8_t *data, uint64_t len)
+      {
+        streamFile("/js/index.js.gz", client, "application/javascript");
+      },
+      "application/javascript");
   server.begin(80);
   return true;
 }
@@ -312,21 +343,45 @@ void command_loop2(char *received_chars)
   }
 }
 
-void readFile(fs::FS &fs, const char *path)
+/*******************************************************************************
+****函数功能: 根据请求的路径发送文件
+****入口参数: &filePath:SPIFFS系统下的文件路径
+****入口参数: *client:指定的web客户端
+****入口参数: &mimeType:文件类型
+****出口参数: -1：文件不存在 0：发送成功
+****函数备注: 由于index.js.gz文件较大(278K)，发送比较容易失败，可以试着多刷新几次
+********************************************************************************/
+int streamFile(const String &filePath, myWebSocket::ExtendedWiFiClient *client, const String &mimeType)
 {
-  Serial.printf("Reading file: %s\r\n", path);
-
-  File file = fs.open(path);
+  File file = SPIFFS.open(filePath, "r");
   if (!file || file.isDirectory())
   {
     Serial.println("- failed to open file for reading");
-    return;
+    client->print("HTTP/1.1 404\r\n");
+    client->print("Connection: close\r\n");
+    client->print("Content-Type: text/plain\r\n");
+    client->print("Content-Length: 3\r\n\r\n404");
+    client->flush();
+    client->stop();
+    return -1;
   }
-
-  Serial.println("- read from file:");
-  while (file.available())
-  {
-    Serial.write(file.read());
-  }
+  /* 先发送响应头 header
+   * 使用自定义响应头，需要先将 mywebsocket.h中的 autoFillHttpResponseHeader 变量设置为false
+   * 即关闭自动填充响应头信息的功能 */
+  String header = "HTTP/1.1 200 OK\r\n";
+  header += (String("Content-Type: ") + mimeType + String("\r\n"));
+  header += "Connection: keep-alive\r\n";
+  if (filePath.endsWith(".gz"))
+    header += "Content-Encoding: gzip\r\n";
+  header += ("Content-Length: " + String(file.size()) + "\r\n");
+  header += "Cache-Control: no-cache\r\n";
+  header += "Access-Control-Allow-Origin: *\r\n\r\n";
+  client->print(header);
+  /* 空一行再发送响应体  */
+  Serial.println(filePath + "," + String(file.size()));
+  uint64_t len2 = client->write(file);
   file.close();
+  client->close();
+  Serial.printf("writeLen:%d\n", len2);
+  return 0;
 }
