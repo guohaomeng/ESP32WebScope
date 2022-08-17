@@ -1,5 +1,5 @@
 <!--
- * @文件路径         : /ESP32WebScope/README.md
+ * @文件路径         : \ESP32WebScope\README.md
  * @作者名称         : guohaomeng
  * @文件版本         : V1.0.0
  * @创建日期         : 2022-07-13 22:26:15
@@ -23,9 +23,10 @@
 示波器部分是通过i2s进行adc采样后发送给上位机显示的，同样也运行在核心1上。每轮采样1024个点，但只取其中256个，取样间隔可通过设置全局变量`sampleStep`来改变。
 
 - 示波器采样率，即I2S采样速率，我在代码里限制为1k~128K
+- 默认采样引脚是ADC1_CHANNEL_7，即GPIO36
 - 示波器更多功能有待继续添加
 
-通信方面，ESP32在`websocket_init`函数中初始化了一个websocket服务器以及一个http服务器。
+通信方面，ESP32在`websocket_init`函数中初始化了一个websocket服务器以及一个http服务器。与通信相关的程序主要运行在核心0上。
 
 这里要感谢来自Vida Wang大佬的[websocket库](https://github.com/vidalouiswang/Arduino_ESP32_Websocket)
 
