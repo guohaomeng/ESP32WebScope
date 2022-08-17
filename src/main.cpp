@@ -187,8 +187,8 @@ bool websocket_init()
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ESP32WebScope</title>
-    <script type="module" crossorigin src="./js/index.js.gz"></script>
-    <link rel="stylesheet" href="./css/index.css.gz">
+    <script type="module" crossorigin src="./js/index.js"></script>
+    <link rel="stylesheet" href="./css/index.css">
   </head>
   <body style="margin: 0;">
     <div id="app"></div>
@@ -200,21 +200,21 @@ bool websocket_init()
       },
       "text/html;charset=utf-8");
   server.on(
-      "/index.html.gz",
+      "/index.html",
       [](myWebSocket::ExtendedWiFiClient *client, myWebSocket::HttpMethod method, uint8_t *data, uint64_t len)
       {
         streamFile("/index.html.gz", client, "text/html");
       },
       "text/html");
   server.on(
-      "/css/index.css.gz",
+      "/css/index.css",
       [](myWebSocket::ExtendedWiFiClient *client, myWebSocket::HttpMethod method, uint8_t *data, uint64_t len)
       {
         streamFile("/css/index.css.gz", client, "text/css");
       },
       "text/css");
   server.on(
-      "/js/index.js.gz",
+      "/js/index.js",
       [](myWebSocket::ExtendedWiFiClient *client, myWebSocket::HttpMethod method, uint8_t *data, uint64_t len)
       {
         streamFile("/js/index.js.gz", client, "application/javascript");
