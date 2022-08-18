@@ -34,7 +34,7 @@ http服务器主要提供静态网页托管功能，可以将存放在flash中�
 
 websocket服务器主要用于同客户端建立websocket连接并进行双向通信，客户端通过web界面向ESP32发送指令以更改参数，ESP32则可以主动向客户端发送采样数据及其他信息
 
-web界面如下所示，其源代码见我的另一个仓库`ESP32WebScopeUI`
+web界面如下所示，其源代码见我的另一个仓库[ESP32WebScopeUI](https://github.com/guohaomeng/ESP32WebScopeUI)
 
 ![web](./image/web.png)
 
