@@ -1,5 +1,5 @@
 /*******************************************************************************
-****文件路径         : /ESP32WebScope/src/main.cpp
+****文件路径         : \ESP32WebScope\src\main.cpp
 ****作者名称         : guohaomeng
 ****文件版本         : V1.0.0
 ****创建日期         : 2022-07-01 13:07:26
@@ -20,7 +20,7 @@
 #define ADC_SAMPLE_SIZE 256
 float ADC_sample[ADC_SAMPLE_SIZE];
 uint32_t sampleRate = 2000; // 根据实测，真实的I2S采样频率应为此值的一半
-int sampleStep = 1;
+int sampleStep = 2;
 bool chart_refresh = false;
 
 /* 实例化一个波形发生器 */
@@ -92,7 +92,7 @@ void setup()
   websocket_init();
   Serial.println("websocket初始化成功");
   /* 创建任务2，建立并保持与上位机的通信 */
-  xTaskCreatePinnedToCore(Task2, "Task2", 24 * 4096, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(Task2, "Task2", 12 * 1024, NULL, 1, NULL, 0);
   vTaskDelay(50 / portTICK_PERIOD_MS);
 }
 /*******************************************************************************
@@ -271,10 +271,17 @@ void command_loop(void)
     i2s_adc.set_sample_rate((uint32_t)R);
     Serial.printf("%s,%d\n", received_chars, R);
   }
-  if (received_chars[0] == 'W') // R指令设置I2S_ADC采样速率
+  if (received_chars[0] == 'W') // W指令设置波形种类
   {
     int W = atoi(received_chars + 1);
     wave_gen.waveSelect(W);
+  }
+  if (received_chars[0] == 'S') // S指令设置取样间隔
+  {
+    int S = atoi(received_chars + 1);
+    if (S > 0 && S <= 4)
+      sampleStep = S;
+    Serial.printf("S,%d\n", S);
   }
   //  最后清空串口
   while (Serial.read() >= 0)
@@ -325,6 +332,13 @@ void command_loop2(char *received_chars)
   {
     int W = atoi(received_chars + 1);
     wave_gen.waveSelect(W);
+  }
+  if (received_chars[0] == 'S') // S指令设置取样间隔
+  {
+    int S = atoi(received_chars + 1);
+    if (S > 0 && S <= 4)
+      sampleStep = S;
+    Serial.printf("SampleStep,%d\n", S);
   }
   if (received_chars[0] == 'C' && received_chars[1] == 'T')
   { // CT使能发送采样数据

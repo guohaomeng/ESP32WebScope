@@ -1,5 +1,5 @@
 /*******************************************************************************
-****文件路径         : /ESP32WebScope/src/i2s_adc.hpp
+****文件路径         : \ESP32WebScope\src\i2s_adc.hpp
 ****作者名称         : guohaomeng
 ****文件版本         : V1.0.0
 ****创建日期         : 2022-07-14 10:43:39
@@ -36,7 +36,7 @@ public:
       .dma_buf_len = NUM_SAMPLES, // 缓冲区大小 = dma_buf_len * chan_num * bits_per_chan / 8 = NUM_SAMPLES * 1 * 16 / 8 = 2048字节
       .use_apll = true,           // I2S 使用 APLL 作为 I2S 主时钟，使其能够获得准确的时钟
   };
-  uint16_t i2s_read_buff[NUM_SAMPLES * 2]; // i2s读取缓冲区
+  uint16_t i2s_read_buff[NUM_SAMPLES]; // i2s读取缓冲区
   float adcBuff[NUM_SAMPLES] = {0};
 
   I2S_ADC();
@@ -106,27 +106,19 @@ I2S_ADC::~I2S_ADC() {}
 ********************************************************************************/
 int I2S_ADC::get_adc_data(float *po_AdcValues, int length, int step)
 {
-  // uint16_t *i2s_read_buff = malloc(sizeof(uint16_t) * NUM_SAMPLES*2);
-  // uint16_t i2s_read_buff[NUM_SAMPLES*2];
   is_sample = true;
   size_t num_bytes_read = 0;
 
-  i2s_read(I2S_NUM_0, (void *)i2s_read_buff, NUM_SAMPLES * 2 * sizeof(uint16_t), &num_bytes_read, portMAX_DELAY);
+  i2s_read(I2S_NUM_0, &i2s_read_buff, sizeof(i2s_read_buff), &num_bytes_read, portMAX_DELAY);
 
-  int NumSamps = num_bytes_read / (2 * sizeof(uint16_t));
-
-  for (int i = 0, j = 0; i < NumSamps; i++)
+  int NumSamps = num_bytes_read / (2);
+  for (int i = 0, j = 0; i < NumSamps; i++, j++)
   { //将12位值转换为电压
-    adcBuff[i] = 3.3 * ((float)(i2s_read_buff[i * 2] & 0x0FFF)) / 0x0FFF;
-    if (NumSamps % step == 0 && step > 0)
-    {
-      if (j < length)
-        po_AdcValues[j] = adcBuff[i];
-      j += step;
-    }
+    adcBuff[i] = 3.3 * ((float)(i2s_read_buff[i] & 0x0FFF)) / 0x0FFF;
+    if ((j < length) && (i * step) < NumSamps)
+      po_AdcValues[j] = adcBuff[i * step];
   }
   is_sample = false;
-  // free(i2s_read_buff);
   return NumSamps; // 返回读取的样本数
 }
 /*******************************************************************************
