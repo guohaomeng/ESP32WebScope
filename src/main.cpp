@@ -19,7 +19,7 @@
 #define FORMAT_SPIFFS_IF_FAILED true
 #define ADC_SAMPLE_SIZE 256
 float ADC_sample[ADC_SAMPLE_SIZE];
-uint32_t sampleRate = 2000; // 根据实测，真实的I2S采样频率应为此值的一半
+uint32_t sampleRate = 2000; // 示波器显示的采样频率 = sampleRate / sampleStep
 int sampleStep = 2;
 bool chart_refresh = false;
 
