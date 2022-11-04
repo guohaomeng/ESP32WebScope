@@ -234,15 +234,15 @@ void I2S_ADC::i2s_reset()
 ********************************************************************************/
 bool I2S_ADC::set_sample_rate(uint32_t rate)
 {
-  if (rate > 128000 || rate < 1000)
+  if (rate > 550000 || rate < 1000)
   {
     return false;
   }
   is_change_rate = true;
-  sample_rate_old = sample_rate;
-  sample_rate = rate;
   if (i2s_config.channel_format <= 2)
     rate /= 2; // 左右声道模式采集会导致真实采样率变为设定值的一倍，这里补回来
+  sample_rate_old = sample_rate;
+  sample_rate = rate;
   esp_err_t ret;
   while (1)
   {

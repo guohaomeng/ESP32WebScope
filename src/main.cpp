@@ -342,14 +342,17 @@ void command_loop2(char *received_chars)
   if (received_chars[0] == 'S') // S指令设置取样间隔
   {
     int S = atoi(received_chars + 1);
-    if (S > 0 && S <= 4)
+    if (S > 0 && S <= 4){
       sampleStep = S;
+      wave_gen.sampleStep = sampleStep;
+    }
     Serial.printf("SampleStep,%d\n", S);
   }
   if (received_chars[0] == 'T') // T指令设置触发模式
   {
     int T = atoi(received_chars + 1);
-      i2s_adc.set_trigger_mode(T);
+    if(i2s_adc.set_trigger_mode(T))
+      wave_gen.trigger_mode = (int)(i2s_adc.trigger_mode); 
     Serial.printf("TriggerMode,%d\n", T);
   }
   if (received_chars[0] == 'C' && received_chars[1] == 'T')
