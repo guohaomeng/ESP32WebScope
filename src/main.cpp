@@ -19,7 +19,7 @@
 #define FORMAT_SPIFFS_IF_FAILED true
 #define ADC_SAMPLE_SIZE 256
 float ADC_sample[ADC_SAMPLE_SIZE];
-uint32_t sampleRate = 2000; // 示波器显示的采样频率 = sampleRate / sampleStep
+uint32_t sampleRate = 8000; // 示波器显示的采样频率 = sampleRate / sampleStep
 int sampleStep = 1;
 bool chart_refresh = false;
 
@@ -287,7 +287,7 @@ void command_loop(void)
   {
     int T = atoi(received_chars + 1);
       i2s_adc.set_trigger_mode(T);
-    Serial.printf("SampleStep,%d\n", T);
+    Serial.printf("TriggerMode,%d\n", T);
   }
   //  最后清空串口
   while (Serial.read() >= 0)
@@ -350,7 +350,7 @@ void command_loop2(char *received_chars)
   {
     int T = atoi(received_chars + 1);
       i2s_adc.set_trigger_mode(T);
-    Serial.printf("SampleStep,%d\n", T);
+    Serial.printf("TriggerMode,%d\n", T);
   }
   if (received_chars[0] == 'C' && received_chars[1] == 'T')
   { // CT使能发送采样数据

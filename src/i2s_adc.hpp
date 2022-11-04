@@ -13,7 +13,7 @@
 #include <driver/i2s.h>
 
 #define ADC_CHANNEL ADC1_CHANNEL_7 // GPIO35
-#define NUM_SAMPLES 1024
+#define NUM_SAMPLES 2048
 
 enum TRIGGER_MODE
 {
@@ -38,17 +38,19 @@ public:
       .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_ADC_BUILT_IN),
       .sample_rate = sample_rate,
       .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-      .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT,
-      .intr_alloc_flags = 0,
-      .dma_buf_count = 8,
-      .dma_buf_len = NUM_SAMPLES, // 缓冲区大小 = dma_buf_len * chan_num * bits_per_chan / 8 = NUM_SAMPLES * 1 * 16 / 8 = 2048字节
-      .use_apll = true,           // I2S 使用 APLL 作为 I2S 主时钟，使其能够获得准确的时钟
-  };
+      .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT, // 双声道模式采集会使实际采样率加倍，且得到的波形噪声更少
+      .communication_format = I2S_COMM_FORMAT_STAND_I2S,
+      .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
+      .dma_buf_count = 16,
+      .dma_buf_len = 1024, // 缓冲区大小 = dma_buf_len * chan_num * bits_per_chan / 8 = NUM_SAMPLES * 1 * 16 / 8 = 2048字节
+      .use_apll = true,    // I2S 使用 APLL 作为 I2S 主时钟，使其能够获得准确的时钟
+      .tx_desc_auto_clear = false,
+      .fixed_mclk = 0};
   uint16_t i2s_read_buff[NUM_SAMPLES]; // i2s读取缓冲区
   float adcBuff[NUM_SAMPLES] = {0};
   float adc_max_value = 0;
   float adc_min_value = 0;
-  TRIGGER_MODE trigger_mode = UP;
+  TRIGGER_MODE trigger_mode = DOWN;
 
   I2S_ADC();
   I2S_ADC(i2s_port_t i2s_num, uint32_t sample_rate, adc1_channel_t channel, adc_bits_width_t width_bit);
@@ -72,10 +74,10 @@ I2S_ADC::I2S_ADC()
       .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_ADC_BUILT_IN),
       .sample_rate = (8000),
       .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-      .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT,
+      .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
       .intr_alloc_flags = 0,
       .dma_buf_count = 4,
-      .dma_buf_len = NUM_SAMPLES,
+      .dma_buf_len = 1024,
       .use_apll = false,
   };
 
@@ -107,6 +109,7 @@ I2S_ADC::I2S_ADC(i2s_port_t i2s_num, uint32_t sample_rate, adc1_channel_t channe
   i2s_driver_install(i2s_num, &i2s_config, 0, NULL);
   i2s_set_adc_mode(ADC_UNIT_1, channel);
   i2s_adc_enable(i2s_num);
+  set_sample_rate(sample_rate);
 }
 I2S_ADC::~I2S_ADC() {}
 /*******************************************************************************
@@ -119,14 +122,18 @@ I2S_ADC::~I2S_ADC() {}
 ********************************************************************************/
 int I2S_ADC::get_adc_data(float *po_AdcValues, int length, int step)
 {
+  i2s_adc_enable(I2S_NUM_0);
   is_sample = true;
   size_t num_bytes_read = 0;
-  i2s_read(I2S_NUM_0, &i2s_read_buff, sizeof(i2s_read_buff), &num_bytes_read, portMAX_DELAY);
+  i2s_zero_dma_buffer(I2S_NUM_0);
+  memset(i2s_read_buff, 0x00, NUM_SAMPLES);
+  memset(adcBuff, 0x00, NUM_SAMPLES);
+  i2s_read(I2S_NUM_0, &i2s_read_buff, sizeof(i2s_read_buff), &num_bytes_read, (int)(20 * (277000 / sample_rate)));
   /* 第一个for循环，数据预处理 */
   int NumSamps = num_bytes_read / (2);
   for (int i = 0; i < NumSamps; i++)
   { //将12位值转换为电压
-    adcBuff[i] = 3.3 * ((float)(i2s_read_buff[i] & 0x0FFF)) / 0x0FFF;
+    adcBuff[i] = 3.3 * (float)((i2s_read_buff[i] & 0x0FFF)) / 0x0FFF;
     /* 找出峰峰值 */
     if (adcBuff[i] > adc_max_value)
       adc_max_value = adcBuff[i];
@@ -146,6 +153,7 @@ int I2S_ADC::get_adc_data(float *po_AdcValues, int length, int step)
     }
   }
   is_sample = false;
+  i2s_adc_disable(I2S_NUM_0);
   return NumSamps; // 返回读取的样本数
 }
 /*******************************************************************************
@@ -157,7 +165,9 @@ int I2S_ADC::find_trigger_index(int NumSamps)
 {
   if (trigger_mode == NONE)
     return -1;
-  int cmpBuff[NUM_SAMPLES] = {0};int index = -1;
+  uint8_t cmpBuff[NUM_SAMPLES] = {0};
+  memset(cmpBuff, 0, NUM_SAMPLES);
+  int index = -1;
   float adc_mid_value = (adc_max_value - adc_min_value) / 2;
   for (int i = 0; i < NumSamps; i++)
   {
@@ -219,7 +229,8 @@ void I2S_ADC::i2s_reset()
 ****函数功能: 设置示波器采样率
 ****入口参数: rate:示波器采样率，实测真实采样率为此值的一半
 ****出口参数: true:成功 false:失败
-****函数备注: 无
+****函数备注: 似乎最高能到277k？https://github.com/espressif/arduino-esp32/blob/
+             master/libraries/ESP32/examples/I2S/HiFreq_ADC/HiFreq_ADC.ino
 ********************************************************************************/
 bool I2S_ADC::set_sample_rate(uint32_t rate)
 {
@@ -230,6 +241,8 @@ bool I2S_ADC::set_sample_rate(uint32_t rate)
   is_change_rate = true;
   sample_rate_old = sample_rate;
   sample_rate = rate;
+  if (i2s_config.channel_format <= 2)
+    rate /= 2; // 左右声道模式采集会导致真实采样率变为设定值的一倍，这里补回来
   esp_err_t ret;
   while (1)
   {
@@ -253,7 +266,7 @@ bool I2S_ADC::set_sample_rate(uint32_t rate)
 ********************************************************************************/
 bool I2S_ADC::set_trigger_mode(int mode)
 {
-  if (mode >= 1 && mode <= 2)
+  if (mode >= 1 && mode <= 4)
   {
     trigger_mode = (enum TRIGGER_MODE)(mode);
     return true;
@@ -263,7 +276,6 @@ bool I2S_ADC::set_trigger_mode(int mode)
     Serial.println("触发模式参数错误");
     return false;
   }
-    
 }
 
 #endif
