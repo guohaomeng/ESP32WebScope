@@ -9,5 +9,6 @@
     "*.tcc": "cpp",
     "cmath": "cpp",
     "utility": "cpp"
-  }
+  },
+  "commentTranslate.source": "Bing"
 }
