@@ -85,7 +85,10 @@ void setup()
     Serial.println("SPIFFS Mount Failed");
     return;
   }
-  // readFile(SPIFFS, "/index.html.gz");
+  /* 添加一个50kHz的PWM极限测试信号 */
+  ledcSetup(5,50000,8);
+  ledcAttachPin(GPIO_NUM_5,5);
+  ledcWrite(GPIO_NUM_5,127);
   /* 初始化波形发生器 */
   wave_gen.initTimer();
   Serial.println("波形发生器初始化成功");
