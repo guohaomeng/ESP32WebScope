@@ -1,5 +1,5 @@
 /*******************************************************************************
-****文件路径         : /ESP32WebScope/src/wave_gen.hpp
+****文件路径         : \ESP32WebScope\src\wave_gen.hpp
 ****作者名称         : guohaomeng
 ****文件版本         : V1.0.0
 ****创建日期         : 2022-07-01 11:43:37
@@ -43,6 +43,8 @@ public:
   uint8_t waveTab1[SAMPLE_PER_CYCLE]; // 生成的波形数据
 
   uint32_t sample_rate = 8000;       // i2s_adc的采样速度，仅用于发送
+  uint8_t  sampleStep = 1;           // i2s_adc的取样间隔，仅用于发送
+  uint8_t  trigger_mode = 3;         // i2s_adc的触发模式，仅用于发送
 
   /* 波形模式切换按键 */
   const int button = 12; // 波形切换引脚位置
@@ -329,7 +331,7 @@ int WAVE_GEN::set_freq(int value)
 String WAVE_GEN::get_param()
 {
   param = "";
-  /* 发送如下格式字符串 {"param":{"U":3.3,"B":1.65,"D":50,"F":100,"R":8000,"W":1}} */
+  /* 发送如下格式字符串 {"param":{"U":3.3,"B":1.65,"D":50,"F":100,"R":8000,,"S":1,"T":3,"W":1}} */
   param += "{\"param\":{\"U\":";
   param += String(uMaxValue);
   param += String(",\"B\":");
@@ -340,6 +342,10 @@ String WAVE_GEN::get_param()
   param += String(freq);
   param += String(",\"R\":");
   param += String(sample_rate);
+  param += String(",\"S\":");
+  param += String(sampleStep);
+  param += String(",\"T\":");
+  param += String(trigger_mode);
   param += String(",\"W\":");
   param += String((int)wave_type);
   param += String("}}");

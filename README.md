@@ -20,10 +20,12 @@
 - 可设置偏置电压与峰峰值
 - 默认输出引脚 DAC channel 1 即 GPIO25(ESP32)
 
-示波器部分是通过i2s进行adc采样后发送给上位机显示的，同样也运行在核心1上。每轮采样1024个点，但只取其中256个，取样间隔可通过设置全局变量`sampleStep`来改变。
+示波器部分是通过i2s进行adc采样后发送给上位机显示的，同样也运行在核心1上。每轮采样2048个点，但只取其中256个，取样间隔可通过设置全局变量`sampleStep`来改变。
 
-- 示波器采样率，即I2S采样速率，我在代码里限制为1k~128K
-- 默认采样引脚是ADC1_CHANNEL_7，即GPIO36
+- 示波器采样率，即I2S采样速率，我在代码里限制为1k~550K
+- 默认采样引脚是ADC1_CHANNEL_7，即GPIO35
+- 取样间隔调整，相当于波形横轴放大，目前最高4倍，适用于观察低频信号
+- 软件触发，目前实现了上升沿/下降沿触发
 - 示波器更多功能有待继续添加
 
 通信方面，ESP32在`websocket_init`函数中初始化了一个websocket服务器以及一个http服务器。与通信相关的程序主要运行在核心0上。
@@ -34,9 +36,13 @@ http服务器主要提供静态网页托管功能，可以将存放在flash中�
 
 websocket服务器主要用于同客户端建立websocket连接并进行双向通信，客户端通过web界面向ESP32发送指令以更改参数，ESP32则可以主动向客户端发送采样数据及其他信息
 
-web界面如下所示，其源代码见我的另一个仓库[ESP32WebScopeUI](https://github.com/guohaomeng/ESP32WebScopeUI)
+web界面如下所示，其源代码见我的另一个仓库：[ESP32WebScopeUI](https://guohaomeng.coding.net/public/waveform_recognition/ESP32WebScopeUI/git/files)
 
-![web](./image/web.png)
+![img1](https://voidtech.cn/i/2022/11/20/vw3dal.png)
+
+更新：额外添加了一个50kHz的PWM信号，用于测试I2S+ADC极限采样率下的采样情况，这时候波形跳变较为严重，不过还能看出波形以及正确统计出频率。
+
+![img2](https://voidtech.cn/i/2022/11/20/vw3mwh.png)
 
 ### 使用方法
 

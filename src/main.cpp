@@ -1,5 +1,5 @@
 /*******************************************************************************
-****文件路径         : /ESP32WebScope/src/main.cpp
+****文件路径         : \ESP32WebScope\src\main.cpp
 ****作者名称         : guohaomeng
 ****文件版本         : V1.0.0
 ****创建日期         : 2022-07-01 13:07:26
@@ -19,7 +19,7 @@
 #define FORMAT_SPIFFS_IF_FAILED true
 #define ADC_SAMPLE_SIZE 256
 float ADC_sample[ADC_SAMPLE_SIZE];
-uint32_t sampleRate = 2000; // 根据实测，真实的I2S采样频率应为此值的一半
+uint32_t sampleRate = 8000; // 示波器显示的采样频率 = sampleRate / sampleStep
 int sampleStep = 1;
 bool chart_refresh = false;
 
@@ -85,14 +85,17 @@ void setup()
     Serial.println("SPIFFS Mount Failed");
     return;
   }
-  // readFile(SPIFFS, "/index.html.gz");
+  /* 添加一个50kHz的PWM极限测试信号 */
+  ledcSetup(5,50000,8);
+  ledcAttachPin(GPIO_NUM_5,5);
+  ledcWrite(GPIO_NUM_5,127);
   /* 初始化波形发生器 */
   wave_gen.initTimer();
   Serial.println("波形发生器初始化成功");
   websocket_init();
   Serial.println("websocket初始化成功");
   /* 创建任务2，建立并保持与上位机的通信 */
-  xTaskCreatePinnedToCore(Task2, "Task2", 24 * 4096, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(Task2, "Task2", 12 * 1024, NULL, 1, NULL, 0);
   vTaskDelay(50 / portTICK_PERIOD_MS);
 }
 /*******************************************************************************
@@ -271,10 +274,23 @@ void command_loop(void)
     i2s_adc.set_sample_rate((uint32_t)R);
     Serial.printf("%s,%d\n", received_chars, R);
   }
-  if (received_chars[0] == 'W') // R指令设置I2S_ADC采样速率
+  if (received_chars[0] == 'W') // W指令设置波形种类
   {
     int W = atoi(received_chars + 1);
     wave_gen.waveSelect(W);
+  }
+  if (received_chars[0] == 'S') // S指令设置取样间隔
+  {
+    int S = atoi(received_chars + 1);
+    if (S > 0 && S <= 4)
+      sampleStep = S;
+    Serial.printf("S,%d\n", S);
+  }
+  if (received_chars[0] == 'T') // T指令设置触发模式
+  {
+    int T = atoi(received_chars + 1);
+      i2s_adc.set_trigger_mode(T);
+    Serial.printf("TriggerMode,%d\n", T);
   }
   //  最后清空串口
   while (Serial.read() >= 0)
@@ -325,6 +341,22 @@ void command_loop2(char *received_chars)
   {
     int W = atoi(received_chars + 1);
     wave_gen.waveSelect(W);
+  }
+  if (received_chars[0] == 'S') // S指令设置取样间隔
+  {
+    int S = atoi(received_chars + 1);
+    if (S > 0 && S <= 4){
+      sampleStep = S;
+      wave_gen.sampleStep = sampleStep;
+    }
+    Serial.printf("SampleStep,%d\n", S);
+  }
+  if (received_chars[0] == 'T') // T指令设置触发模式
+  {
+    int T = atoi(received_chars + 1);
+    if(i2s_adc.set_trigger_mode(T))
+      wave_gen.trigger_mode = (int)(i2s_adc.trigger_mode); 
+    Serial.printf("TriggerMode,%d\n", T);
   }
   if (received_chars[0] == 'C' && received_chars[1] == 'T')
   { // CT使能发送采样数据
